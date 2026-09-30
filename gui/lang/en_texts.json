@@ -1,0 +1,31 @@
+{
+"ux": {
+"welcome": "Welcome to A-Maze-ing!",
+"goodbye": "Thanks for playing A-Maze-ing. Goodbye!",
+"main_menu": "Main Menu",
+"select_option": "Select an option:",
+"press_enter": "Press ENTER to continue."
+},
+"status": {
+"loading": "Loading...",
+"generating_maze": "Generating maze...",
+"maze_ready": "Maze generated successfully.",
+"saving": "Saving...",
+"completed": "Operation completed successfully."
+},
+"warning": {
+"invalid_option": "Invalid option selected.",
+"invalid_value": "The value entered is not valid.",
+"out_of_range": "The value is outside the allowed range.",
+"unsaved_changes": "You have unsaved changes.",
+"default_configuration": "Using the default configuration."
+},
+"error": {
+"file_not_found": "The requested file could not be found.",
+"file_permission": "Detected a permission error in config file.",
+"invalid_configuration": "The configuration is invalid.",
+"invalid_input": "The input could not be understood.",
+"loading_failed": "Failed to load the requested resource.",
+"unknown_error": "An unexpected error occurred."
+}
+}
