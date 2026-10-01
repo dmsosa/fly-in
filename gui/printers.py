@@ -5,9 +5,9 @@ import time
 from git import Optional
 
 from gui.utils import UX
-from menu.menu import Menu
+from menu import Menu
 
-from .constants import BOLD, CYAN, GREEN, RED, RESET, THEME_CHAR, THEME_COLOR, YELLOW
+from .constants import THEME_CHAR, THEME_COLOR
 from .constants import MENU_WIDTH
 
 
@@ -27,7 +27,7 @@ def hex_to_ansi_bg(hex_color: str) -> str:
 
 class FlyinGuiPrinter:
     def __init__(self):
-        self.ansi: bool = False
+        self.is_ansi: bool = False
         self.prettify: bool = False
         self.delay: float = 0.03
 
@@ -109,7 +109,19 @@ class FlyinGuiPrinter:
         print(UX["goodbye"], "\n")
         sys.exit(0)
 
-    def print_menu_lines_ascii(
+    def print_lines(
+            self,
+            title: str,
+            items: list[str],
+            scale: int = 3
+            ) -> None:
+        if self.is_ansi:
+            self._print_menu_ansi(title, items, scale)
+        else:
+            self._print_menu_ascii(title, items, scale)
+
+
+    def _print_lines_ascii(
             self,
             title: str,
             items: list[str],
@@ -147,7 +159,7 @@ class FlyinGuiPrinter:
         print("\n".join(lines))
 
 
-    def print_menu_lines_ansi(
+    def _print_lines_ansi(
         self,
             title: str,
             items: list[str],
@@ -199,7 +211,19 @@ class FlyinGuiPrinter:
         print("\n".join(lines))
 
 
-    def print_menu_ascii(
+    def print_menu(
+            self,
+            menu: Menu,
+            mark: bool = True,
+            scale: int = 3
+            ) -> None:
+        if self.is_ansi:
+            self._print_menu_ansi(menu, mark, scale)
+        else:
+            self._print_menu_ascii(menu, mark, scale)
+
+
+    def _print_menu_ascii(
             self,
             menu: Menu,
             mark: bool = True,
@@ -211,13 +235,13 @@ class FlyinGuiPrinter:
                 THEME_CHAR[0b0011],
                 THEME_CHAR[0b1001],
                 THEME_CHAR[0b1010],
-                THEME_CHAR[0b0001],
+                THEME_CHAR[0b0101],
             ]
         corner_ul = chars[0]
         corner_ur = chars[1]
         corner_bl = chars[2]
         corner_br = chars[3]
-        hor_bar = chars[4] * scale
+        hor_bar = chars[4]
         ver_bar = chars[5]
         top_row = f"{corner_ul}" + hor_bar * MENU_WIDTH * scale + f"{corner_ur}"
         bot_row = f"{corner_bl}" + hor_bar * MENU_WIDTH * scale + f"{corner_br}"
@@ -241,7 +265,7 @@ class FlyinGuiPrinter:
         print("\n".join(lines))
 
 
-    def print_menu_ansi(
+    def _print_menu_ansi(
             self,
             menu: Menu,
             mark: bool = True,
@@ -293,4 +317,3 @@ class FlyinGuiPrinter:
         lines.append(empty_row)
         lines.append(bot_row)
         print("\n".join(lines))
-

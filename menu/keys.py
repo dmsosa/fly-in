@@ -5,7 +5,7 @@ import sys
 import tty
 import termios
 
-from menu.utils import move_cursor_up
+from .utils import move_cursor_up
 
 
 class MenuKey(Enum):

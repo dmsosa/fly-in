@@ -37,3 +37,15 @@ color: str default "none"
 1. Parse one line, depending on its type of text, initialize a specific object and its attributes.
 
 2. Parse one line, add to the graph object.
+
+
+# Moving strategy:
+
+In order to move all drones, I have a FlyinSimulator class which runs while loop until all drones have reached the end hub.
+
+It iterates through each drone. It moves, so it needs the next_zone's position and also need to know its metadata, for that reason, I use rather directly the Zone class rather than just a tuple[int, int].
+
+When I use the connections, actually? That is to optimize and move more than one drone through the same connection in the same turn.
+
+Also, Drone can have their status, waiting, moving or stopped, and it is going to reflect ont he gui.
+

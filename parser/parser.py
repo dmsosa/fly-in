@@ -1,9 +1,9 @@
 from parser.connection_parser import ConnectionParser
 from parser.zone_parser import ZoneParser
 
-from ..error import FlyinParseError
+from error import FlyinParseError
 from parser.utils import valid_line
-from ..model.graph import FlyinGraph
+from model.graph import FlyinGraph
 
 
 
@@ -25,7 +25,9 @@ class FlyinParser:
         """
         with open(file_path, 'r') as f:
             lines = f.readlines()
-            for l in lines:
+            if not lines:
+                raise FlyinParseError("Config file is empty")
+            for row, l in enumerate(lines):
                 if l.startswith("#"):
                     continue
                 if len(l) < 1:
@@ -33,7 +35,7 @@ class FlyinParser:
                 tokens = l.split(" ")
                 first_token = tokens[0][:-1]
                 if not valid_line(first_token):
-                    raise FlyinParseError(f"Not valid configuration file {file_path}")
+                    raise FlyinParseError(f"Invalid configuration file {file_path}. [Line {row}]")
                 if first_token == "hub" \
                     or first_token == "start_hub" \
                         or first_token == "end_hub":
@@ -45,6 +47,6 @@ class FlyinParser:
                 elif first_token == "nb_drones":
                     value = l.split(":")[1]
                     if graph.drone_count is not None:
-                        raise FlyinParseError(f"Not valid configuration file {file_path}\nThe nb_count option is received more than once.\nGraph has defined {graph.drone_count} and received {value}")
+                        raise FlyinParseError(f"Not valid configuration file {file_path}\nThe nb_count option is received more than once.\nGraph has defined {graph.drone_count} and received {value}. [Line {row}]")
                 else:
                     raise FlyinParseError(f"Unkown key detected while parsing: {first_token}")

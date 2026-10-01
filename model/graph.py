@@ -1,6 +1,3 @@
-"""The drone network: zones, connections and an adjacency list."""
-from pydantic import BaseModel, Field
-
 from .connection import Connection
 from .zone import Zone
 

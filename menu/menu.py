@@ -1,11 +1,11 @@
 # src/player/menu.py
 from enum import Enum
+from pathlib import Path
 import sys
 from typing import Any, Callable
 
-from zipp import Path
 
-from menu.menu_builders import MenuOption, build_menu, input_custom_file
+MenuOption = tuple[str, str | None, Callable[[], None]]
 
 class MenuState(Enum):
     MENU = "menu"
@@ -14,6 +14,7 @@ class MenuState(Enum):
     RUN = "run"
     EXIT = "exit"
 
+
 class Level(Enum):
     """Difficulty levels, each one backed by a maps directory."""
 
@@ -21,7 +22,6 @@ class Level(Enum):
     MEDIUM = "medium"
     HARD = "hard"
     CHALLENGER = "challenger"
-
 
 
 MAPS_ROOT = Path("maps")
@@ -72,6 +72,9 @@ class FlyinMenu():
     """
     Holds metadata about the current Flyin Program
     and contains the menus the user can interact with.
+
+    After pressing enter on the LevelMenu, it changes the MenuState to FILE_NAME
+    after pressing enter on FILE_NAME, it changes to MenuState.RUN
     """
     def __init__(self) -> None:
         """Start with nothing selected."""
@@ -79,8 +82,8 @@ class FlyinMenu():
         self._file_name: str | None = None
         self._path_to_config: Path | None = None
         self._menu_state: MenuState = MenuState.LEVEL
-        self._level_menu: Menu | None = None
-        self._filename_menu: Menu | None = None
+        self.level_menu: Menu = self.build_level_menu()
+        self.filename_menu: Menu = self.build_filename_menu()
 
     # ---- state ------------------------------------------------------
     def get_menu_state(self) -> Level | None:
@@ -89,36 +92,77 @@ class FlyinMenu():
 
     def set_menu_state(self, menu_state: MenuState | str) -> None:
         """Select a MenuState or its string value ("level")."""
-        self._menu_state = menu_state if isinstance(menu_state, MenuState) else Level(menu_state)
+        self._menu_state = menu_state if isinstance(menu_state, MenuState) else MenuState(menu_state)
 
     # ---- menus ------------------------------------------------------
-    def build_level_menu(self, on_selected: Callable[..., Any]) -> None:
+    def _build_menu(self, name: str, options: list[MenuOption]) -> Menu:
+        """Build a Menu from plain option tuples.
+
+        Every item gets its 1-based number as a key, plus its hotkey letter
+        (both cases) when given.
+
+        Raises:
+            ValueError: on empty options or duplicated keys.
+        """
+        items: list[MenuItem] = []
+        used: set[str] = set()
+        for idx, (label, hotkey, action) in enumerate(options, start=1):
+            keys = {str(idx)}
+            shown = str(idx)
+            if hotkey:
+                keys |= {hotkey.upper(), hotkey.lower()}
+                shown = hotkey.upper()
+            if keys & used:
+                raise ValueError(f"Duplicated menu key for '{label}'")
+            used |= keys
+            items.append(MenuItem(shown, label, keys, action))
+        return Menu(name, items)
+
+
+    def build_level_menu(self) -> None:
         """Menu 1: easy / medium / hard / challenger / custom file.
 
         Args:
             configuration: Receives the chosen level or custom path.
             on_selected: Called after a choice (advance the menu state).
         """
-        items = [
-            MenuItem()
-        ]
-        self._level_menu = Menu("Flyin menu - select level")
         def choose_level(level: Level) -> Callable[[], None]:
             def action() -> None:
                 self.set_level(level)
-                on_selected()
+                self.filename_menu = self.build_filename_menu()
+                self.set_menu_state("filename")
             return action
 
         def choose_custom() -> None:
             self.input_custom_file()
-            on_selected()
 
-            options: list[MenuOption] = [
-                (level.value.capitalize(), level.value[0], choose_level(level))
-                for level in Level
-            ]
-            options.append(("Custom file", "f", choose_custom))
-            return build_menu("Flyin menu - select level", options)
+        options: list[MenuOption] = [
+            (level.value.capitalize(), level.value[0], choose_level(level))
+            for level in Level
+        ]
+        options.append(("Custom file", "f", choose_custom))
+        return self._build_menu("Flyin menu - select level", options)
+
+
+    def build_filename_menu(self) -> Menu:
+        """Menu 2: one item per *.txt map of the selected level directory."""
+        directory = self.level_directory()
+        names = sorted(p.name for p in directory.glob("*.txt")) \
+            if directory.is_dir() else []
+
+        def choose_file(file_name: str) -> Callable[[], None]:
+            def action() -> None:
+                self.set_file_name(file_name)
+                self.set_menu_state("run")
+            return action
+
+        options: list[MenuOption] = [
+            (name, None, choose_file(name)) for name in names
+        ]
+        level = self.get_level()
+        title = level.value if level else "?"
+        return self._build_menu(f"Flyin menu - select map ({title})", options)
+
 
     def input_custom_file(self) -> None:
         """Ask for a config file path on stdin and store it.
@@ -181,3 +225,6 @@ class FlyinMenu():
             raise FileNotFoundError(f"Config file not found: {candidate}")
         self._path_to_config = candidate
         self._file_name = candidate.name
+
+    def quit(self) -> None:
+        self.set_menu_state(MenuState.EXIT)

@@ -102,6 +102,8 @@ def import_texts(
 
 
 UX, STATUS, WARNING, ERROR = import_texts("en")
+GRID_HEIGHT = 100
+GRID_WIDTH = 200
 UX_MAX: int = 500
 UX_STD: int = 100
 DELAY: float = 0.5
