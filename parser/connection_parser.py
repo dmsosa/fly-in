@@ -1,4 +1,5 @@
-from model.zone import Zone
+from gui.utils import ERROR
+from model.drone import Connection, Zone
 
 
 class ConnectionParseError(Exception):
@@ -12,34 +13,33 @@ class ConnectionParser():
         pass
 
     @staticmethod
-    def parse(tokens: list[str]) -> Zone:
-        first_token = tokens[0][-1]
+    def parse(data_str: str) -> Connection:
+        tokens = data_str.split(" ")
         tokens_len = len(tokens)
-        if tokens_len != 3 and tokens_len != 2:
-            raise ConnectionParser("Invalid parse line")
-        if first_token != "connection":
-            raise ConnectionParser("Invalid connection")
-        zone_names = tokens[1].split("-")
+        if tokens_len < 1 or tokens_len > 2:
+            raise ConnectionParser(ERROR["parser"]["connections"]["parsing_line"].format(data_str))
+        zone_names = tokens[0].split("-")
         if len(zone_names != 2):
-            raise ConnectionParseError(f"Invalid connection zone_names: {zone_names}")
-        from_name = zone_names[0]
-        to_name = zone_names[1]
-        last_token = tokens[-1]
-        has_metadata = last_token[0] == "[" and last_token[-1] == "]"
-        if has_metadata:
-            metadata = tokens[-1].strip("[]")
-            metadata_tokens = metadata.split(" ")
-            max_link_capacity = None
-            for data in metadata_tokens:
-                parts = data.split("=")
-                if len(parts) != 2:
-                    raise ConnectionParser("Invalid metadata line for zone")
-                key, value = parts
-                if key == "max_link_capacity":
-                    max_link_capacity = value
-                else:
-                    raise ConnectionParser("Invalid key metadata for zone")
-        from_zone = graph.zone_by_name[from_name]
-        to_zone = graph.zone_by_name[to_name]
-        conn = Connection(from_zone, to_zone, max_link_capacity)
-        return new_zone
+            raise ConnectionParseError(ERROR["parser"]["connections"]["zone_names"].format(zone_names))
+        zone_a = zone_names[0]
+        zone_b = zone_names[1]
+        if tokens_len == 2:
+            last_token = tokens[-1]
+            valid_metadata = last_token[0] == "[" and last_token[-1] == "]"
+            if valid_metadata:
+                metadata = tokens[-1].strip("[]")
+                metadata_tokens = metadata.split(" ")
+                max_link_capacity = None
+                for token in metadata_tokens:
+                    parts = token.split("=")
+                    if len(parts) != 2:
+                        raise ConnectionParser(ERROR["parser"]["metadata_token"].format(token))
+                    key, value = parts
+                    if key == "max_link_capacity":
+                        max_link_capacity = value
+                    else:
+                        raise ConnectionParser(ERROR["parser"]["connections"]["metadata_key"].format(key))
+            else:
+                raise ConnectionParseError(ERROR["parser"]["metadata_format"].format(last_token))
+        conn = Connection(zone_a, zone_b, max_link_capacity)
+        return conn

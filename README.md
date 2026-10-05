@@ -38,6 +38,19 @@ color: str default "none"
 
 2. Parse one line, add to the graph object.
 
+# The Models...
+
+I have written the classes without Pydantic first because I thought the validation process could be simple enough to put inside an __init__ method,
+unfortunately (or not) it was not the case.
+
+# Display the menu:
+
+The program starts by allowing the user to interact with a menu that allows you to open an specific file within the current directory. And the parser process each line of the configuration file, to add connections and zones to the graph progressively. 
+
+After the graph is built, I can find the actual solutions for it. 
+
+The simulator.simulate() receives a graph, returns a void.
+
 
 # Moving strategy:
 

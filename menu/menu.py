@@ -1,30 +1,14 @@
 # src/player/menu.py
-from enum import Enum
 from pathlib import Path
-import sys
-from typing import Any, Callable
+from typing import List, Union
+from gui.constants import THEME_CHAR, THEME_COLOR, MENU_WIDTH
+from gui.printers import FlyinGuiPrinter
+from gui.utils import UX, hex_to_ansi_fg
+from menu.keys import MenuKey, read_menu_key
+from gui.printers_utils import move_cursor
 
 
-MenuOption = tuple[str, str | None, Callable[[], None]]
-
-class MenuState(Enum):
-    MENU = "menu"
-    LEVEL = "level"
-    FILE_NAME = "filename"
-    RUN = "run"
-    EXIT = "exit"
-
-
-class Level(Enum):
-    """Difficulty levels, each one backed by a maps directory."""
-
-    EASY = "easy"
-    MEDIUM = "medium"
-    HARD = "hard"
-    CHALLENGER = "challenger"
-
-
-MAPS_ROOT = Path("maps")
+MAPS_ROOT = Path(".")
 
 
 class MenuItem:
@@ -33,20 +17,24 @@ class MenuItem:
             key: str,
             label: str,
             keys: set[str],
-            action: Callable[..., Any]
     ):
         self.key = key
         self.label = label
-        self.action = action
         self.keys = keys
 
 
 class Menu:
-    def __init__(self, name: str, items: list[MenuItem]):
+    def __init__(
+            self,
+            name: str,
+            items: list[str],
+            ):
         self.name = name
-        self.items = items
+        self.items = []
+        for idx, item in enumerate(items):
+            self.items.append(MenuItem(str(idx), item, { item[0], item[0].upper, str(idx) }))
         self.selected_index: int = 0
-        self.items_len = len(items)
+        self.items_len: int = len(items)
 
     def get_item(self, key: str) -> MenuItem:
         for idx, item in enumerate(self.items):
@@ -66,148 +54,247 @@ class Menu:
     def selected_item(self) -> MenuItem:
         return self.items[self.selected_index]
 
+    def run(self) -> Union[int, None]:
+        try:
+            key = read_menu_key()
+            if key is MenuKey.UP:
+                self.move_up()
+                return None
+            elif key is MenuKey.DOWN:
+                self.move_down()
+                return None
+            elif key is MenuKey.SELECT:
+                return self.selected_index
+            elif key is MenuKey.EXIT:
+                return -1
+            else:
+                selected_item = self.get_item(key)
+                index = 0
+                for i in self.items:
+                    if selected_item.key == i.key:
+                        return index
+                    index += 1
+                return None
+        except KeyError as e:
+            print(f"Unknown key pressed for menu '{self.name}'\n{e}")
+            
 
 #"""Run configuration chosen by the user through the menus."""
 class FlyinMenu():
     """
     Holds metadata about the current Flyin Program
     and contains the menus the user can interact with.
+    It builds interactive menus to build its own object
+    the interactive menu is just a while loop that returns
+    an index.
 
     After pressing enter on the LevelMenu, it changes the MenuState to FILE_NAME
     after pressing enter on FILE_NAME, it changes to MenuState.RUN
     """
-    def __init__(self) -> None:
+    def __init__(self, printer: FlyinGuiPrinter) -> None:
         """Start with nothing selected."""
-        self._level: Level = Level.EASY
-        self._file_name: str | None = None
+        self.items: List[str]
+        self._config_dir: Path | None = None
+        self._file_name: Path | None = None
         self._path_to_config: Path | None = None
-        self._menu_state: MenuState = MenuState.LEVEL
-        self.level_menu: Menu = self.build_level_menu()
-        self.filename_menu: Menu = self.build_filename_menu()
-
-    # ---- state ------------------------------------------------------
-    def get_menu_state(self) -> Level | None:
-        """Return the selected menu_state, or None."""
-        return self._menu_state
-
-    def set_menu_state(self, menu_state: MenuState | str) -> None:
-        """Select a MenuState or its string value ("level")."""
-        self._menu_state = menu_state if isinstance(menu_state, MenuState) else MenuState(menu_state)
+        self.active_menu: Menu | None
+        self.printer = printer
 
     # ---- menus ------------------------------------------------------
-    def _build_menu(self, name: str, options: list[MenuOption]) -> Menu:
-        """Build a Menu from plain option tuples.
-
-        Every item gets its 1-based number as a key, plus its hotkey letter
-        (both cases) when given.
-
-        Raises:
-            ValueError: on empty options or duplicated keys.
-        """
-        items: list[MenuItem] = []
-        used: set[str] = set()
-        for idx, (label, hotkey, action) in enumerate(options, start=1):
-            keys = {str(idx)}
-            shown = str(idx)
-            if hotkey:
-                keys |= {hotkey.upper(), hotkey.lower()}
-                shown = hotkey.upper()
-            if keys & used:
-                raise ValueError(f"Duplicated menu key for '{label}'")
-            used |= keys
-            items.append(MenuItem(shown, label, keys, action))
-        return Menu(name, items)
+    def print_menu(
+            self,
+            menu: Menu,
+            mark: bool = True,
+            scale: int = 3,
+            frame: bool = False
+            ) -> None:
+        if self.printer.is_ansi:
+            self._print_menu_ansi(menu, mark, scale, frame)
+        else:
+            self._print_menu_ascii(menu, mark, scale, frame)
 
 
-    def build_level_menu(self) -> None:
-        """Menu 1: easy / medium / hard / challenger / custom file.
+    def _print_menu_ascii(
+            self,
+            menu: Menu,
+            mark: bool = True,
+            scale: int = 3,
+            frame: bool = False
+            ) -> None:
+        chars = [
+                THEME_CHAR[0b0110],
+                THEME_CHAR[0b1100],
+                THEME_CHAR[0b0011],
+                THEME_CHAR[0b1001],
+                THEME_CHAR[0b1010],
+                THEME_CHAR[0b0101],
+            ]
+        corner_ul = chars[0]
+        corner_ur = chars[1]
+        corner_bl = chars[2]
+        corner_br = chars[3]
+        hor_bar = chars[4]
+        ver_bar = chars[5]
+        top_row = f"{corner_ul}" + hor_bar * MENU_WIDTH * scale + f"{corner_ur}"
+        bot_row = f"{corner_bl}" + hor_bar * MENU_WIDTH * scale + f"{corner_br}"
+        empty_row = ver_bar + " " * MENU_WIDTH * scale + ver_bar
+        if frame:
+            lines = [
+                top_row,
+                ver_bar + "{:^{w}}".format(menu.name, w=MENU_WIDTH * scale) + ver_bar,
+                empty_row
+            ]
+        else:
+            lines = []
+        for i in range(0, menu.items_len):
+            item = menu.items[i]
+            is_selected = " >>" if \
+                i == menu.selected_index and mark \
+                else ""
+            text = f"{is_selected} [{item.key}]: {item.label}"
+            if frame:
+                line = ver_bar + "{:<{w}}".format(text, w=MENU_WIDTH * scale) + ver_bar
+            else:
+                line = "{:<{w}}".format(text, w=MENU_WIDTH * scale)
+            lines.append(line)
+        if frame:
+            lines.append(empty_row)
+            lines.append(bot_row)
+        print("\n".join(lines))
 
-        Args:
-            configuration: Receives the chosen level or custom path.
-            on_selected: Called after a choice (advance the menu state).
-        """
-        def choose_level(level: Level) -> Callable[[], None]:
-            def action() -> None:
-                self.set_level(level)
-                self.filename_menu = self.build_filename_menu()
-                self.set_menu_state("filename")
-            return action
 
-        def choose_custom() -> None:
-            self.input_custom_file()
+    def _print_menu_ansi(
+            self,
+            menu: Menu,
+            mark: bool = True,
+            scale: int = 3,
+            frame: bool = False
+            ) -> None:
+        chars = [
+                THEME_CHAR[0b0110],
+                THEME_CHAR[0b1100],
+                THEME_CHAR[0b0011],
+                THEME_CHAR[0b1001],
+                THEME_CHAR[0b1010],
+                THEME_CHAR[0b0101],
+            ]
+        corner_ul = chars[0]
+        corner_ur = chars[1]
+        corner_bl = chars[2]
+        corner_br = chars[3]
+        hor_bar = chars[4]
+        ver_bar = chars[5]
+        accent = hex_to_ansi_fg(THEME_COLOR["primary"])
+        highlight = hex_to_ansi_fg(THEME_COLOR["secondary"])
+        reset = "\033[0m"
+        top_row = (
+            f"{accent}{corner_ul}" + hor_bar * MENU_WIDTH * scale +
+            f"{corner_ur}{reset}"
+            )
+        bot_row = (
+            f"{accent}{corner_bl}" + hor_bar * MENU_WIDTH * scale +
+            f"{corner_br}{reset}")
+        accent_bar = accent + ver_bar + reset
+        empty_row = accent_bar + " " * MENU_WIDTH * scale + accent_bar
+        if frame:
+            lines = [
+                top_row,
+                accent_bar + "{:^{w}}".format(
+                    menu.name, w=MENU_WIDTH * scale) + accent_bar,
+                empty_row
+            ]
+        else:
+            lines = []
+        for i in range(0, menu.items_len):
+            item = menu.items[i]
+            is_selected = " >>" if \
+                i == menu.selected_index and mark\
+                else ""
+            color = highlight if is_selected else ""
+            reset_color = reset if is_selected else ""
+            text = f"{is_selected} [{item.key}]: {item.label}"
+            if frame:
+                line = accent_bar + color + text.ljust((MENU_WIDTH * scale)) + reset_color + accent_bar
+            else:
+                line = color + text.ljust((MENU_WIDTH * scale)) + reset_color
+            lines.append(line)
+        
+        if frame:
+            lines.append(empty_row)
+            lines.append(bot_row)
+        print("\n".join(lines))
 
-        options: list[MenuOption] = [
-            (level.value.capitalize(), level.value[0], choose_level(level))
-            for level in Level
-        ]
-        options.append(("Custom file", "f", choose_custom))
-        return self._build_menu("Flyin menu - select level", options)
 
+    def run_select_path_menu(self) -> None:
+        current_dir = MAPS_ROOT
+        while True:
+            self.printer.clear_screen()
+            self.printer.print_top_row()
+            print()
+            print(f" {UX['select_map']}")
+            print()
+            current_rel = current_dir.relative_to(MAPS_ROOT)
+            print(f" 📁 Path: {current_rel}")
+            print()
+    
+            self.items = []
+            paths: list[str] = []
 
-    def build_filename_menu(self) -> Menu:
-        """Menu 2: one item per *.txt map of the selected level directory."""
-        directory = self.level_directory()
-        names = sorted(p.name for p in directory.glob("*.txt")) \
-            if directory.is_dir() else []
+            if current_dir != MAPS_ROOT:
+                self.items.append("⬅️  Back to parent")
+                paths.append("..")
+            try:
+                entries = sorted(current_dir.iterdir())
+                for entry in entries:
+                    if entry.name.startswith((".", "_", "venv", "requirements")):
+                        continue
+                    if entry.is_dir():
+                        self.items.append(f"📁 {entry.name}/")
+                        paths.append(entry.name)
+                    elif entry.suffix == ".txt":
+                        self.items.append(f"📄 {entry.name}")
+                        paths.append(entry.name)
+            except PermissionError:
+                print(UX["permission_denied"])
+                continue
 
-        def choose_file(file_name: str) -> Callable[[], None]:
-            def action() -> None:
-                self.set_file_name(file_name)
-                self.set_menu_state("run")
-            return action
+            if len(self.items) == 0:
+                print(UX["no_files_found"])
+                continue
+    
+            self.items.append("❌ Exit")
+            paths.append(None)
 
-        options: list[MenuOption] = [
-            (name, None, choose_file(name)) for name in names
-        ]
-        level = self.get_level()
-        title = level.value if level else "?"
-        return self._build_menu(f"Flyin menu - select map ({title})", options)
+            self.active_menu = Menu(
+                UX["select_map_instructions"],
+                self.items
+                )
 
+            idx = None
+            while idx is None:
+                move_cursor(7, 0)
+                self.print_menu(self.active_menu)
+                idx = self.active_menu.run()
 
-    def input_custom_file(self) -> None:
-        """Ask for a config file path on stdin and store it.
+            if idx == -1:
+                return None
 
-        Raises:
-            FileNotFoundError: if the path does not exist (caller exits).
-        """
-        print("Insert custom file name:")
-        print(">> ", end="", flush=True)
-        path = sys.stdin.readline().strip()
-        self.set_path_to_config(path)
+            selected = paths[idx]
+            if selected is None:
+                return None
 
-    # ---- level ------------------------------------------------------
-    def get_level(self) -> Level | None:
-        """Return the selected level, or None."""
-        return self._level
+            if selected == "..":
+                current_dir = current_dir.parent
+                continue
 
-    def set_level(self, level: Level | str) -> None:
-        """Select a level from a Level or its string value ("easy")."""
-        self._level = level if isinstance(level, Level) else Level(level)
-        self._file_name = None
-        self._path_to_config = None
-
-    def level_directory(self) -> Path:
-        """Return the maps directory of the selected level."""
-        if self._level is None:
-            raise ValueError("No level selected")
-        return MAPS_ROOT / self._level.value
-
-    # ---- file name --------------------------------------------------
-    def get_file_name(self) -> str | None:
-        """Return the selected map file name, or None."""
-        return self._file_name
-
-    def set_file_name(self, file_name: str) -> None:
-        """Select a map inside the current level directory.
-
-        Raises:
-            FileNotFoundError: if the file does not exist.
-        """
-        path = self.level_directory() / file_name
-        if not path.is_file():
-            raise FileNotFoundError(f"Map file not found: {path}")
-        self._file_name = file_name
-        self._path_to_config = path
+            path = current_dir / selected
+            if path.is_dir():
+                current_dir = path
+                continue
+            
+            if path.is_file() and path.suffix == ".txt":
+                self.set_path_to_config(str(path))
+                break 
 
     # ---- path -------------------------------------------------------
     def get_path_to_config(self) -> Path | None:
@@ -225,6 +312,3 @@ class FlyinMenu():
             raise FileNotFoundError(f"Config file not found: {candidate}")
         self._path_to_config = candidate
         self._file_name = candidate.name
-
-    def quit(self) -> None:
-        self.set_menu_state(MenuState.EXIT)

@@ -1,52 +1,108 @@
+from typing import Any
+from gui.utils import ERROR, STATUS
 from parser.connection_parser import ConnectionParser
 from parser.zone_parser import ZoneParser
 
 from error import FlyinParseError
-from parser.utils import valid_line
-from model.graph import FlyinGraph
-
-
 
 
 class FlyinParser:
-    """Holds the level, file name and final path of the map to load."""
+    """
+    Parser is going to build a dictionary without caring about the actual values
+    and pass them to the corresponding Pydantic Models for more complex validation
+    once a Zone is sucessfully created, you can pass the entire dictionary to the
+    parent pydantic model "Graph"
 
+    Graph of zones (vertices) and connections (edges).
+    fields:
+    drone_count # number of drones the graph contains
+    start_zone # starting zone for all drones
+    end_zone # goal zone for all drones
+    zones # all zones in a set
+    connections # all connections in a set
+    """
+
+    """Holds the level, file name and final path of the map to load."""
     def __init__(self) -> None:
         """Start with nothing selected."""
         pass
 
-    @staticmethod
-    def parse(file_path: str, graph: "FlyinGraph") -> None:
+    def _valid_key(self, key: str) -> bool:
+        return key == "nb_drones" \
+                or key == "hub" \
+                or key == "start_hub" \
+                or key == "end_hub" \
+                or key == "connection"
+
+    def parse(self, file_path: str) -> dict[str, Any]:
         """
         This function receives the file_path after the user interacted with the menu
         then reads the file and builds the flyin graph.
 
         Handles all file-related exceptions
-        """
+        """        
         with open(file_path, 'r') as f:
+            filename = file_path.split("/")[-1].removesuffix(".txt")
+            print(STATUS["parsing_map"].format(filename=filename), end="")
             lines = f.readlines()
             if not lines:
-                raise FlyinParseError("Config file is empty")
-            for row, l in enumerate(lines):
-                if l.startswith("#"):
-                    continue
-                if len(l) < 1:
-                    continue
-                tokens = l.split(" ")
-                first_token = tokens[0][:-1]
-                if not valid_line(first_token):
-                    raise FlyinParseError(f"Invalid configuration file {file_path}. [Line {row}]")
-                if first_token == "hub" \
-                    or first_token == "start_hub" \
-                        or first_token == "end_hub":
-                    new_zone = ZoneParser.parse(l)
-                    graph.add_zone(new_zone)
-                elif first_token == "connection":
-                    conn = ConnectionParser.parse(l)
-                    graph.add_connection(conn)
-                elif first_token == "nb_drones":
-                    value = l.split(":")[1]
-                    if graph.drone_count is not None:
-                        raise FlyinParseError(f"Not valid configuration file {file_path}\nThe nb_count option is received more than once.\nGraph has defined {graph.drone_count} and received {value}. [Line {row}]")
-                else:
-                    raise FlyinParseError(f"Unkown key detected while parsing: {first_token}")
+                raise FlyinParseError(ERROR["parser"]["file_empty"])
+            print(STATUS["OK"])
+
+        result_dict = {
+            "drone_count": None,
+            "start_zone": None,
+            "end_zone": None,
+            "zones": [],
+            "connections": [],
+        }
+        for row, l in enumerate(lines):
+            l = l.strip()
+            if not l or l.startswith("#"):
+                continue
+
+            key, data = l.lower().split(":", 1)
+            key = key.strip()
+            data = data.strip()
+            if not self.valid_key(key):
+                raise FlyinParseError(ERROR["parser"]["key"].format(key, row + 1))
+
+            if key == "hub":
+                new_zone = ZoneParser.parse(data)
+                result_dict["zones"].append(new_zone)
+            elif key == "start_hub":
+                if result_dict["start_zone"] is not None:
+                    raise FlyinParseError(ERROR["parser"]["duplicate_start_zone"])
+                new_zone = ZoneParser.parse(data)
+                result_dict["start_hub"].append(new_zone)
+            elif key == "end_hub":
+                if result_dict["end_zone"] is not None:
+                    raise FlyinParseError(ERROR["parser"]["duplicate_end_zone"])
+                new_zone = ZoneParser.parse(data)
+                result_dict["end_hub"].append(new_zone)
+            elif key == "connection":
+                conn = ConnectionParser.parse(data)
+                result_dict["connections"].append(conn)
+            elif key == "nb_drones":
+                try:
+                    value = int(data)
+                except ValueError:
+                    raise ValueError(ERROR["parser"]["nb_drones"].format(data))
+                if result_dict["drone_count"] is not None:
+                    msg = "" \
+                        f"Not valid configuration file {file_path}\n" \
+                        f"The nb_count option was defined more than once.\n" \
+                        f"   └── {result_dict["nb_count"]}, {value}" \
+                        f"   └── [Line {row}]" \
+                    ""
+                    raise FlyinParseError(msg)
+                result_dict["drone_count"] = value
+    
+        if not result_dict["start_hub"]:
+            raise ValueError(ERROR["parser"]["missing_key"].format("start_hub"))
+        if not result_dict["end_hub"]:
+            raise ValueError(ERROR["parser"]["missing_key"].format("end_hub"))
+        if not result_dict["drone_count"]:
+            raise ValueError(ERROR["parser"]["missing_key"].format("drone_count"))
+
+        return result_dict

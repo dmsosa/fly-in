@@ -3,11 +3,9 @@ import sys
 import time
 
 from git import Optional
-
 from gui.utils import UX
-from menu import Menu
-
-from .constants import THEME_CHAR, THEME_COLOR
+from .printers_utils import move_cursor_up
+from .constants import RESET, THEME_CHAR, THEME_COLOR
 from .constants import MENU_WIDTH
 
 
@@ -41,29 +39,29 @@ class FlyinGuiPrinter:
         Returns:
             str: Centered multiline ASCII string.
         """
-        ascii_art = r"""   ___  ___
-    /'___\/\_ \                      __
+        ascii_art = r"""                                          
+       ___  ___
+     /'___\/\_ \                      __
     /\ \__/\//\ \    __  __          /\_\    ___
     \ \ ,__\ \ \ \  /\ \/\ \  _______\/\ \ /' _ `\
-    \ \ \_/  \_\ \_\ \ \_\ \/\______\\ \ \/\ \/\ \
-    \ \_\   /\____\\/`____ \/______/ \ \_\ \_\ \_\
-    \/_/   \/____/ `/___/> \         \/_/\/_/\/_/
-                        /\___/
-                        \/__/                      """
+     \ \ \_/  \_\ \_\ \ \_\ \/\______\\ \ \/\ \/\ \
+      \ \_\   /\____\\/`____ \/______/ \ \_\ \_\ \_\
+       \/_/   \/____/ `/___/> \         \/_/\/_/\/_/
+                         /\___/
+                         \/__/                      """
         return ascii_art.center(100)
 
     # ── Helper: ANSI typing illusion ────────────────────────────────
-    def print_line(self, text: str) -> None:
+    def _print_line(self, text: str) -> None:
         """Print *text* one character at a time (ANSI cursor tricks)."""
         print("\033[?25l", end="")  # hide cursor
         for ch in text:
             print(ch, end="", flush=True)
             time.sleep(self.delay)
         print("\033[?25h")  # show cursor again
-        print()  # newline
+        sys.stdout.write("\r")
 
-
-    def erase_line(self, s: str) -> None:
+    def _erase_line(self, s: str) -> None:
         sys.stdout.write("\r")
         for _ in s:
             sys.stdout.write(" ")
@@ -71,22 +69,22 @@ class FlyinGuiPrinter:
             time.sleep(self.delay)
         sys.stdout.write("\r")
 
-
-    def move_cursor_up(self, rows: int) -> None:
-        sys.stdout.write(f"\033[{rows}A")
-
     def print_wrap(self, msg: str) -> None:
         if self.prettify:
             self._print_line(msg)
-            self._erase_line(msg)
         else:
             print(msg)
 
     def print_presentation(self) -> None:
         """Displays the interactive title graphic for program launch."""
         self.clear_screen()
-        print()
-        print(self.title(), end="\n" * 3)
+        if self.is_ansi:
+            accent = hex_to_ansi_fg(THEME_COLOR["primary"])
+            reset = "\033[0m"
+        else:
+            accent = ""
+            reset = ""
+        print(f"{accent}{self.title()}{reset}", end="\n" * 3)
         self.wait_for_enter(None)
 
 
@@ -98,14 +96,21 @@ class FlyinGuiPrinter:
         """
         if message is None:
             message = UX["press_enter"]
-        input(message)
+        self.print_wrap(message)
+        sys.stdin.readline()
 
 
     def print_goodbye(self) -> None:
         """Exits the application gracefully displaying parting graphics."""
         self.clear_screen()
         print("\n\n")
-        print(self.title(), end="\n" * 3)
+        if self.is_ansi:
+            accent = hex_to_ansi_fg(THEME_COLOR["primary"])
+            reset = "\033[0m"
+        else:
+            accent = ""
+            reset = ""
+        print(f"{accent}{self.title()}{reset}", end="\n" * 3)
         print(UX["goodbye"], "\n")
         sys.exit(0)
 
@@ -211,109 +216,83 @@ class FlyinGuiPrinter:
         print("\n".join(lines))
 
 
-    def print_menu(
+    def print_top_row(
             self,
-            menu: Menu,
-            mark: bool = True,
-            scale: int = 3
-            ) -> None:
-        if self.is_ansi:
-            self._print_menu_ansi(menu, mark, scale)
-        else:
-            self._print_menu_ascii(menu, mark, scale)
-
-
-    def _print_menu_ascii(
-            self,
-            menu: Menu,
-            mark: bool = True,
             scale: int = 3
             ) -> None:
         chars = [
                 THEME_CHAR[0b0110],
                 THEME_CHAR[0b1100],
-                THEME_CHAR[0b0011],
-                THEME_CHAR[0b1001],
                 THEME_CHAR[0b1010],
-                THEME_CHAR[0b0101],
             ]
         corner_ul = chars[0]
         corner_ur = chars[1]
-        corner_bl = chars[2]
-        corner_br = chars[3]
-        hor_bar = chars[4]
-        ver_bar = chars[5]
-        top_row = f"{corner_ul}" + hor_bar * MENU_WIDTH * scale + f"{corner_ur}"
-        bot_row = f"{corner_bl}" + hor_bar * MENU_WIDTH * scale + f"{corner_br}"
-        empty_row = ver_bar + " " * MENU_WIDTH * scale + ver_bar
-        lines = [
-            top_row,
-            ver_bar + "{:^{w}}".format(menu.name, w=MENU_WIDTH * scale) + ver_bar,
-            empty_row
-        ]
-        for i in range(0, menu.items_len):
-            item = menu.items[i]
-            is_selected = " >>" if \
-                i == menu.selected_index and mark \
-                else ""
-            line = f"{is_selected} [{item.key}]: {item.label}"
-            lines.append(
-                ver_bar + "{:<{w}}".format(line, w=MENU_WIDTH * scale) + ver_bar
-            )
-        lines.append(empty_row)
-        lines.append(bot_row)
-        print("\n".join(lines))
-
-
-    def _print_menu_ansi(
-            self,
-            menu: Menu,
-            mark: bool = True,
-            scale: int = 3
-            ) -> None:
-        chars = [
-                THEME_CHAR[0b0110],
-                THEME_CHAR[0b1100],
-                THEME_CHAR[0b0011],
-                THEME_CHAR[0b1001],
-                THEME_CHAR[0b1010],
-                THEME_CHAR[0b0101],
-            ]
-        corner_ul = chars[0]
-        corner_ur = chars[1]
-        corner_bl = chars[2]
-        corner_br = chars[3]
-        hor_bar = chars[4]
-        ver_bar = chars[5]
+        hor_bar = chars[2]
         accent = hex_to_ansi_fg(THEME_COLOR["primary"])
-        highlight = hex_to_ansi_fg(THEME_COLOR["secondary"])
         reset = "\033[0m"
-        top_row = (
-            f"{accent}{corner_ul}" + hor_bar * MENU_WIDTH * scale +
-            f"{corner_ur}{reset}"
-            )
-        bot_row = (
-            f"{accent}{corner_bl}" + hor_bar * MENU_WIDTH * scale +
-            f"{corner_br}{reset}")
+        if self.is_ansi:
+            top_row = (
+                f"{accent}{corner_ul}" + hor_bar * MENU_WIDTH * scale +
+                f"{corner_ur}{reset}"
+                )
+        else:
+            top_row = (
+                f"{corner_ul}" + hor_bar * MENU_WIDTH * scale +
+                f"{corner_ur}"
+                )
+        print(top_row)
+
+    def print_empty_row(
+            self,
+            scale: int = 3
+            ) -> None:
+        ver_bar = THEME_CHAR[0b0101]
+        accent = hex_to_ansi_fg(THEME_COLOR["primary"])
+        reset = "\033[0m"
         accent_bar = accent + ver_bar + reset
-        empty_row = accent_bar + " " * MENU_WIDTH * scale + accent_bar
-        lines = [
-            top_row,
-            accent_bar + "{:^{w}}".format(
-                menu.name, w=MENU_WIDTH * scale) + accent_bar,
-            empty_row
+        if self.is_ansi:
+            empty_row = accent_bar + " " * MENU_WIDTH * scale + accent_bar
+        else:
+            empty_row = ver_bar + " " * MENU_WIDTH * scale + ver_bar
+        print(empty_row)
+
+    def print_line_framed(
+            self,
+            text: str,
+            scale: int = 3
+            ) -> None:
+        ver_bar = THEME_CHAR[0b0101]
+        accent = hex_to_ansi_fg(THEME_COLOR["primary"])
+        reset = "\033[0m"
+        accent_bar = accent + ver_bar + reset
+        if self.is_ansi:
+            row = accent_bar + f"{text:<{MENU_WIDTH * scale }}" + accent_bar
+        else:
+            row = ver_bar + f"{text:<{MENU_WIDTH * scale }}" + ver_bar
+        print(row)
+
+    def print_bot_row(
+            self,
+            scale: int = 3
+            ) -> None:
+        chars = [
+            THEME_CHAR[0b0011],
+            THEME_CHAR[0b1001],
+            THEME_CHAR[0b1010]
         ]
-        for i in range(0, menu.items_len):
-            item = menu.items[i]
-            is_selected = " >>" if \
-                i == menu.selected_index and mark\
-                else ""
-            color = highlight if is_selected else ""
-            reset_color = reset if is_selected else ""
-            text = f"{is_selected} [{item.key}]: {item.label}"
-            line = accent_bar + color + "{:<{w}}".format(
-                text, w=MENU_WIDTH * scale) + reset_color + accent_bar
-            lines.append(line)
-        lines.append(empty_row)
-        lines.append(bot_row)
-        print("\n".join(lines))
+        corner_bl = chars[0]
+        corner_br = chars[1]
+        hor_bar = chars[2]
+        accent = hex_to_ansi_fg(THEME_COLOR["primary"])
+        reset = "\033[0m"
+        if self.is_ansi:
+            bot_row = (
+                f"{accent}{corner_bl}" + hor_bar * MENU_WIDTH * scale +
+                f"{corner_br}{reset}"
+                )
+        else:
+            bot_row = (
+                f"{corner_bl}" + hor_bar * MENU_WIDTH * scale +
+                f"{corner_br}"
+                )
+        print(bot_row)

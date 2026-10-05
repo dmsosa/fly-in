@@ -1,4 +1,5 @@
-from model.zone import Zone
+from gui.utils import ERROR
+from model.drone import Zone
 
 
 class ZoneParseError(Exception):
@@ -12,33 +13,47 @@ class ZoneParser():
         pass
 
     @staticmethod
-    def parse(tokens: list[str]) -> Zone:
-        first_token = tokens[0][-1]
-        if len(tokens) != 5:
-            raise ZoneParseError("Invalid parse line")
-        if first_token != "hub":
-            raise ZoneParseError("Invalid zone")
-        is_start = first_token == "start_hub"
-        is_end = first_token == "end_hub"
-        name = tokens[1]
-        coords = (tokens[2], tokens[3])
-        metadata = tokens[-1].strip("[]")
-        metadata_tokens = metadata.split(" ")
-        for data in metadata_tokens:
-            parts = data.split("=")
-            if len(parts) != 2:
-                raise ZoneParseError("Invalid metadata line for zone")
-            zone_type = None
-            color = None
-            max_drones = 1
-            key, value = parts
-            if key == "color":
-                color = value
-            elif key == "max_drones":
-                max_drones = value
-            elif key == "zone":
-                zone_type = value
-            else:
-                raise ZoneParseError("Invalid key metadata for zone")
-        new_zone = Zone(name, coords, color, zone_type, max_drones, is_start, is_end)
+    def parse(data_str: str) -> Zone:
+        tokens = data_str.split(" ")
+        tokens_len = len(tokens)
+        if tokens_len < 1 or tokens_len > 4 or tokens_len < 3:
+            raise ZoneParseError(ERROR["parser"]["zones"]["parsing_line"].format(data_str))
+        name = tokens[0]
+        try:
+            coords = (int(tokens[1]), int(tokens[2]))
+        except ValueError:
+            raise ZoneParseError(
+                ERROR["parser"]["zones"]["coords"].format(
+                        zone=name,
+                        coords=(
+                            tokens[1],
+                            tokens[2]
+                        )
+                    )
+                )
+        if tokens_len == 4:
+            last_token = tokens[-1]
+            valid_metadata = last_token[0] == "[" and last_token[-1] == "]"
+            if valid_metadata:
+                metadata = last_token.strip("[]")
+                metadata_tokens = metadata.split(" ")
+                zone_type = None
+                color = None
+                max_drones = 1
+                for token in metadata_tokens:
+                    parts = token.split("=")
+                    if len(parts) != 2:
+                        raise ZoneParseError(ERROR["parser"]["metadata_token"].format(token))
+                    key, value = parts
+                    if key == "color":
+                        color = value
+                    elif key == "max_drones":
+                        max_drones = value
+                    elif key == "zone":
+                        zone_type = value
+                    else:
+                        raise ZoneParseError(ERROR["parser"]["zones"]["metadata_key"].format(key))
+        
+        new_zone = Zone(name, coords, color, zone_type, max_drones)
+        
         return new_zone

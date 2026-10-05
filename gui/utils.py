@@ -2,13 +2,10 @@ from typing import Tuple, Dict, List, Optional, Any
 from itertools import count
 from pathlib import Path
 from textwrap import wrap
-import sys
 from textwrap import wrap
-import sys
-import os
 import json
-
 from typing import Any, Dict, Tuple
+
 
 def default_texts() -> Tuple[
 Dict[str, Any],
@@ -34,6 +31,8 @@ Dict[str, Any],
         "goodbye": "Thanks for playing A-Maze-ing. Goodbye!",
         "main_menu": "Main Menu",
         "select_option": "Select an option:",
+        "select_map": "Select an option:",
+        "select_map_instructions": "Select an option:",
         "press_enter": "Press ENTER to continue.",
     }
 
@@ -142,3 +141,17 @@ def slice_str(
     str_list = str_list[:max_lines]
     new = [line for s in str_list for line in wrap(s, max_char_line)]
     return new
+
+
+def hex_to_ansi_fg(hex_color: str) -> str:
+    """Convert '#rrggbb' to a 24-bit truecolor ANSI foreground escape."""
+    h = hex_color.lstrip("#")
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return f"\033[38;2;{r};{g};{b}m"
+
+
+def hex_to_ansi_bg(hex_color: str) -> str:
+    """Convert '#rrggbb' to a 24-bit truecolor ANSI background escape."""
+    h = hex_color.lstrip("#")
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return f"\033[48;2;{r};{g};{b}m"

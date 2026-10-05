@@ -1,8 +1,6 @@
 from .graph import FlyinGraph
 from .constants import Coord
-from .connection import Connection
-from .zone import Zone
-from .drone import Drone
+from .drone import Zone
 
 __all__ = [
     "FlyinGraph"
