@@ -62,3 +62,16 @@ When I use the connections, actually? That is to optimize and move more than one
 
 Also, Drone can have their status, waiting, moving or stopped, and it is going to reflect ont he gui.
 
+# Chapter 2:
+
+Sincronizing simulator with the GUI
+
+I want my simulator to:
+
+firts, find all possible paths for each drone, store them in the state
+
+have a method "next_turn" that returns the next movement a drone has done, which is moving to the next cell in their possible paths.
+
+How can I implement this, but with my own simple algorithm that send the drones each time through the next connection which has fewer occupancy?
+
+update the state of my network

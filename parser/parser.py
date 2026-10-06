@@ -46,7 +46,7 @@ class FlyinParser:
             print(STATUS["parsing_map"].format(filename=filename), end="")
             lines = f.readlines()
             if not lines:
-                raise FlyinParseError(ERROR["parser"]["file_empty"])
+                raise FlyinParseError("Config file is empty")
             print(STATUS["OK"])
 
         result_dict = {
@@ -65,19 +65,19 @@ class FlyinParser:
             key = key.strip()
             data = data.strip()
             if not self.valid_key(key):
-                raise FlyinParseError(ERROR["parser"]["key"].format(key, row + 1))
+                raise FlyinParseError(f"Key for parser not recognized: '{key}'. [Line: {row + 1}]")
 
             if key == "hub":
                 new_zone = ZoneParser.parse(data)
                 result_dict["zones"].append(new_zone)
             elif key == "start_hub":
                 if result_dict["start_zone"] is not None:
-                    raise FlyinParseError(ERROR["parser"]["duplicate_start_zone"])
+                    raise FlyinParseError("There must be exactly one start_hub")
                 new_zone = ZoneParser.parse(data)
                 result_dict["start_hub"].append(new_zone)
             elif key == "end_hub":
                 if result_dict["end_zone"] is not None:
-                    raise FlyinParseError(ERROR["parser"]["duplicate_end_zone"])
+                    raise FlyinParseError("There must be exactly one end_hub")
                 new_zone = ZoneParser.parse(data)
                 result_dict["end_hub"].append(new_zone)
             elif key == "connection":
@@ -87,7 +87,7 @@ class FlyinParser:
                 try:
                     value = int(data)
                 except ValueError:
-                    raise ValueError(ERROR["parser"]["nb_drones"].format(data))
+                    raise ValueError(f"Invalid value for drone count: '{value}'")
                 if result_dict["drone_count"] is not None:
                     msg = "" \
                         f"Not valid configuration file {file_path}\n" \
@@ -99,10 +99,10 @@ class FlyinParser:
                 result_dict["drone_count"] = value
     
         if not result_dict["start_hub"]:
-            raise ValueError(ERROR["parser"]["missing_key"].format("start_hub"))
+            raise ValueError("Mandatory key for parser is missing: 'start_hub'.")
         if not result_dict["end_hub"]:
-            raise ValueError(ERROR["parser"]["missing_key"].format("end_hub"))
+            raise ValueError("Mandatory key for parser is missing: 'end_hub'.")
         if not result_dict["drone_count"]:
-            raise ValueError(ERROR["parser"]["missing_key"].format("drone_count"))
+            raise ValueError("Mandatory key for parser is missing: 'nb_drones'.")
 
         return result_dict

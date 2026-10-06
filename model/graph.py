@@ -1,12 +1,11 @@
 from enum import Enum
 from typing import Any, Optional
-
 from pydantic import BaseModel, Field, model_validator
 from pydantic_core import PydanticCustomError
-
 from gui.utils import ERROR
 from model.constants import Coord
 from model.drone import Drone, DroneState
+
 
 class ZoneType(Enum):
     NORMAL = "normal"
@@ -36,6 +35,9 @@ class Zone(BaseModel):
 
     def __hash__(self) -> int:
         return hash(self.name)
+
+    def get_zone_cost(self) -> float:
+        return float("inf")
 
 
 class Connection(BaseModel):
@@ -76,7 +78,8 @@ class Connection(BaseModel):
 
     def get_zone_names(self) -> tuple[str, str]:
         return (self.zone_a, self.zone_b)
-    
+
+
 class FlyinGraph(BaseModel):
     """
     Graph of zones (vertices) and connections (edges).
@@ -168,6 +171,7 @@ class FlyinGraph(BaseModel):
                     )
     
         return self
+
     # ---- building ---------------------------------------------------
     def init_graph(self) -> None:
         # Each drone needs to start in the start_hub

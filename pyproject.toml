@@ -1,0 +1,18 @@
+[project]
+name = "flying"
+version = "0.1.0"
+description = "Orchestrating drones from start to finish"
+authors = [
+    {name = "durisosa"}
+]
+license = "MIT"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "blessed (>=1.50.0,<2.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

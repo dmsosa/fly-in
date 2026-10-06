@@ -1,6 +1,18 @@
 # STRINGS
+from itertools import count
 import re
 
+
+GRID_HEIGHT = 100
+GRID_WIDTH = 200
+UX_MAX: int = 500
+UX_STD: int = 100
+DELAY: float = 0.5
+FAST: float = 0.1
+DIRECT: float = 0.0
+PACE = DELAY
+path_id_generator = count(1)
+drone_helices = count(1)
 
 USERNAME_REGEXP = re.compile(r"[a-z0-9]{3,15}")
 

@@ -1,15 +1,7 @@
 from enum import Enum, auto
-from typing import Any
-
 from git import Optional
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-from pydantic_core import PydanticCustomError
-from gui.utils import ERROR
-from model.constants import ZONE_NAME_REGEXP, ZONE_COLOR_REGEXP, Coord
-from model.graph import Zone
-
-
-
+from pydantic import BaseModel, ConfigDict, Field
+from .graph import Zone
 
 
 class DroneState(Enum):

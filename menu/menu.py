@@ -2,10 +2,11 @@
 from pathlib import Path
 from typing import List, Union
 from gui.constants import THEME_CHAR, THEME_COLOR, MENU_WIDTH
-from gui.printers import FlyinGuiPrinter
+from gui.printers import FlyinPrinter
 from gui.utils import UX, hex_to_ansi_fg
 from menu.keys import MenuKey, read_menu_key
 from gui.printers_utils import move_cursor
+from menu.utils import clear_screen
 
 
 MAPS_ROOT = Path(".")
@@ -91,152 +92,25 @@ class FlyinMenu():
     After pressing enter on the LevelMenu, it changes the MenuState to FILE_NAME
     after pressing enter on FILE_NAME, it changes to MenuState.RUN
     """
-    def __init__(self, printer: FlyinGuiPrinter) -> None:
+    def __init__(self, printer: FlyinPrinter) -> None:
         """Start with nothing selected."""
         self.items: List[str]
         self._config_dir: Path | None = None
         self._file_name: Path | None = None
         self._path_to_config: Path | None = None
         self.active_menu: Menu | None
-        self.printer = printer
-
-    # ---- menus ------------------------------------------------------
-    def print_menu(
-            self,
-            menu: Menu,
-            mark: bool = True,
-            scale: int = 3,
-            frame: bool = False
-            ) -> None:
-        if self.printer.is_ansi:
-            self._print_menu_ansi(menu, mark, scale, frame)
-        else:
-            self._print_menu_ascii(menu, mark, scale, frame)
-
-
-    def _print_menu_ascii(
-            self,
-            menu: Menu,
-            mark: bool = True,
-            scale: int = 3,
-            frame: bool = False
-            ) -> None:
-        chars = [
-                THEME_CHAR[0b0110],
-                THEME_CHAR[0b1100],
-                THEME_CHAR[0b0011],
-                THEME_CHAR[0b1001],
-                THEME_CHAR[0b1010],
-                THEME_CHAR[0b0101],
-            ]
-        corner_ul = chars[0]
-        corner_ur = chars[1]
-        corner_bl = chars[2]
-        corner_br = chars[3]
-        hor_bar = chars[4]
-        ver_bar = chars[5]
-        top_row = f"{corner_ul}" + hor_bar * MENU_WIDTH * scale + f"{corner_ur}"
-        bot_row = f"{corner_bl}" + hor_bar * MENU_WIDTH * scale + f"{corner_br}"
-        empty_row = ver_bar + " " * MENU_WIDTH * scale + ver_bar
-        if frame:
-            lines = [
-                top_row,
-                ver_bar + "{:^{w}}".format(menu.name, w=MENU_WIDTH * scale) + ver_bar,
-                empty_row
-            ]
-        else:
-            lines = []
-        for i in range(0, menu.items_len):
-            item = menu.items[i]
-            is_selected = " >>" if \
-                i == menu.selected_index and mark \
-                else ""
-            text = f"{is_selected} [{item.key}]: {item.label}"
-            if frame:
-                line = ver_bar + "{:<{w}}".format(text, w=MENU_WIDTH * scale) + ver_bar
-            else:
-                line = "{:<{w}}".format(text, w=MENU_WIDTH * scale)
-            lines.append(line)
-        if frame:
-            lines.append(empty_row)
-            lines.append(bot_row)
-        print("\n".join(lines))
-
-
-    def _print_menu_ansi(
-            self,
-            menu: Menu,
-            mark: bool = True,
-            scale: int = 3,
-            frame: bool = False
-            ) -> None:
-        chars = [
-                THEME_CHAR[0b0110],
-                THEME_CHAR[0b1100],
-                THEME_CHAR[0b0011],
-                THEME_CHAR[0b1001],
-                THEME_CHAR[0b1010],
-                THEME_CHAR[0b0101],
-            ]
-        corner_ul = chars[0]
-        corner_ur = chars[1]
-        corner_bl = chars[2]
-        corner_br = chars[3]
-        hor_bar = chars[4]
-        ver_bar = chars[5]
-        accent = hex_to_ansi_fg(THEME_COLOR["primary"])
-        highlight = hex_to_ansi_fg(THEME_COLOR["secondary"])
-        reset = "\033[0m"
-        top_row = (
-            f"{accent}{corner_ul}" + hor_bar * MENU_WIDTH * scale +
-            f"{corner_ur}{reset}"
-            )
-        bot_row = (
-            f"{accent}{corner_bl}" + hor_bar * MENU_WIDTH * scale +
-            f"{corner_br}{reset}")
-        accent_bar = accent + ver_bar + reset
-        empty_row = accent_bar + " " * MENU_WIDTH * scale + accent_bar
-        if frame:
-            lines = [
-                top_row,
-                accent_bar + "{:^{w}}".format(
-                    menu.name, w=MENU_WIDTH * scale) + accent_bar,
-                empty_row
-            ]
-        else:
-            lines = []
-        for i in range(0, menu.items_len):
-            item = menu.items[i]
-            is_selected = " >>" if \
-                i == menu.selected_index and mark\
-                else ""
-            color = highlight if is_selected else ""
-            reset_color = reset if is_selected else ""
-            text = f"{is_selected} [{item.key}]: {item.label}"
-            if frame:
-                line = accent_bar + color + text.ljust((MENU_WIDTH * scale)) + reset_color + accent_bar
-            else:
-                line = color + text.ljust((MENU_WIDTH * scale)) + reset_color
-            lines.append(line)
-        
-        if frame:
-            lines.append(empty_row)
-            lines.append(bot_row)
-        print("\n".join(lines))
-
+        self.printer: FlyinPrinter = printer
 
     def run_select_path_menu(self) -> None:
         current_dir = MAPS_ROOT
         while True:
-            self.printer.clear_screen()
-            self.printer.print_top_row()
-            print()
-            print(f" {UX['select_map']}")
-            print()
+            clear_screen()
+
+            print(f"\n{UX['select_map']}\n")
             current_rel = current_dir.relative_to(MAPS_ROOT)
-            print(f" 📁 Path: {current_rel}")
-            print()
-    
+            print(f" 📁 Path: {current_rel}\n")
+
+        
             self.items = []
             paths: list[str] = []
 
@@ -262,22 +136,20 @@ class FlyinMenu():
                 print(UX["no_files_found"])
                 continue
     
-            self.items.append("❌ Exit")
+            self.items.append("❌  Exit")
             paths.append(None)
 
             self.active_menu = Menu(
-                UX["select_map_instructions"],
+                "Select an option:",
                 self.items
                 )
 
             idx = None
             while idx is None:
-                move_cursor(7, 0)
-                self.print_menu(self.active_menu)
+                menu_height = len(self.active_menu.items)
+                move_cursor(menu_height, 0)
+                self.printer.print_menu(self.active_menu)
                 idx = self.active_menu.run()
-
-            if idx == -1:
-                return None
 
             selected = paths[idx]
             if selected is None:
@@ -295,6 +167,26 @@ class FlyinMenu():
             if path.is_file() and path.suffix == ".txt":
                 self.set_path_to_config(str(path))
                 break 
+
+    def run_confirm_file_map(self) -> None:
+        self.items = [
+            "Continue with simulation",
+            "Choose another file",
+            "Exit the program"
+        ]
+        self.active_menu = Menu(
+            "Select an option:",
+            self.items
+            )
+
+        idx = None
+        while idx is None:
+            menu_height = len(self.active_menu.items)
+            move_cursor(menu_height, 0)
+            self.printer.print_menu(self.active_menu)
+            idx = self.active_menu.run()
+
+        return idx
 
     # ---- path -------------------------------------------------------
     def get_path_to_config(self) -> Path | None:

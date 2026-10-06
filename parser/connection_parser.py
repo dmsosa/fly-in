@@ -1,5 +1,5 @@
 from gui.utils import ERROR
-from model.drone import Connection, Zone
+from model import Connection
 
 
 class ConnectionParseError(Exception):
@@ -17,10 +17,10 @@ class ConnectionParser():
         tokens = data_str.split(" ")
         tokens_len = len(tokens)
         if tokens_len < 1 or tokens_len > 2:
-            raise ConnectionParser(ERROR["parser"]["connections"]["parsing_line"].format(data_str))
+            raise ConnectionParser(f"Invalid metadata line for connection '{data_str}'.")
         zone_names = tokens[0].split("-")
         if len(zone_names != 2):
-            raise ConnectionParseError(ERROR["parser"]["connections"]["zone_names"].format(zone_names))
+            raise ConnectionParseError(f"Invalid metadata zone names for connection '{zone_names}'.")
         zone_a = zone_names[0]
         zone_b = zone_names[1]
         if tokens_len == 2:
@@ -33,13 +33,13 @@ class ConnectionParser():
                 for token in metadata_tokens:
                     parts = token.split("=")
                     if len(parts) != 2:
-                        raise ConnectionParser(ERROR["parser"]["metadata_token"].format(token))
+                        raise ConnectionParser(f"Invalid metadata token '{token}'.")
                     key, value = parts
                     if key == "max_link_capacity":
                         max_link_capacity = value
                     else:
-                        raise ConnectionParser(ERROR["parser"]["connections"]["metadata_key"].format(key))
+                        raise ConnectionParser(f"Metadata key for connection '{key}' not recognized.")
             else:
-                raise ConnectionParseError(ERROR["parser"]["metadata_format"].format(last_token))
+                raise ConnectionParseError(f"Invalid metadata format '{last_token}'.")
         conn = Connection(zone_a, zone_b, max_link_capacity)
         return conn

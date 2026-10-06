@@ -1,4 +1,4 @@
-from .printers import FlyinGuiPrinter
+from .printers import FlyinPrinter
 from .utils import UX, \
     STATUS, \
     WARNING, \
@@ -9,5 +9,5 @@ from .utils import UX, \
     FAST, \
     DIRECT, \
     PACE, \
-    path_id_generator, \
-    drone_helices
+    clear_screen, \
+    clear_from_cursor
