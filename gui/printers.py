@@ -1,13 +1,13 @@
-import os
 import sys
 import time
+from typing import TYPE_CHECKING, Optional
 
-from git import Optional
-from gui.utils import UX
-from menu.menu import Menu
-from .printers_utils import move_cursor_up
+from .utils import clear_screen
 from .constants import THEME_CHAR, THEME_COLOR
 from .constants import MENU_WIDTH
+
+if TYPE_CHECKING:
+    from menu import Menu
 
 
 def hex_to_ansi_fg(hex_color: str) -> str:
@@ -74,7 +74,7 @@ class FlyinPrinter:
 
     def print_presentation(self) -> None:
         """Displays the interactive title graphic for program launch."""
-        self.clear_screen()
+        clear_screen()
         if self.is_ansi:
             accent = hex_to_ansi_fg(THEME_COLOR["primary"])
             reset = "\033[0m"
@@ -92,7 +92,7 @@ class FlyinPrinter:
             message (str, optional): Custom override string to display.
         """
         if message is None:
-            message = UX["press_enter"]
+            message = "Press enter..."
         self.print_wrap(message)
         sys.stdin.readline()
 
@@ -107,8 +107,8 @@ class FlyinPrinter:
         else:
             accent = ""
             reset = ""
-        print(f"{accent}{self.title()}{reset}", end="\n" * 3)
-        print(UX["goodbye"], "\n")
+        self.print_wrap(f"{accent}{self.title()}{reset}", end="\n" * 3)
+        self.print_wrap("Thanks for using the fly-in project, :)", "\n")
         sys.exit(0)
 
     def print_lines(
@@ -297,7 +297,7 @@ class FlyinPrinter:
     # ---- menus ------------------------------------------------------
     def print_menu(
             self,
-            menu: Menu,
+            menu: "Menu",
             mark: bool = True,
             scale: int = 3,
             frame: bool = False
@@ -310,7 +310,7 @@ class FlyinPrinter:
 
     def _print_menu_ascii(
             self,
-            menu: Menu,
+            menu: "Menu",
             mark: bool = True,
             scale: int = 3,
             frame: bool = False
@@ -359,7 +359,7 @@ class FlyinPrinter:
 
     def _print_menu_ansi(
             self,
-            menu: Menu,
+            menu: "Menu",
             mark: bool = True,
             scale: int = 3,
             frame: bool = False

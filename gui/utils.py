@@ -13,7 +13,8 @@ def wait_for_enter(message: Optional[str]) -> None:
     """
     if message is None:
         message = "Press ENTER to continue..."
-    input(message)
+    print(message)
+    sys.stdin.readline()
 
 
 def slice_str(
@@ -47,7 +48,7 @@ def hex_to_ansi_bg(hex_color: str) -> str:
     r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
     return f"\033[48;2;{r};{g};{b}m"
 
-def clear_screen(self) -> None:
+def clear_screen() -> None:
     """Clears the console or terminal screen cleanly."""
     os.system("cls" if os.name == "nt" else "clear")
 

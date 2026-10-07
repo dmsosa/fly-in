@@ -1,6 +1,6 @@
-from model import FlyinGraph, Coord
-from model.drone import ZoneType
-from pathfinding.base import Pathfinding
+from src.model import FlyinGraph, Coord
+from src.model.drone import ZoneType
+from src.pathfinding.base import Pathfinding
 
 
 class AstarPathfinding(Pathfinding):

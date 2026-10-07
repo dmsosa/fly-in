@@ -2,10 +2,8 @@ from enum import Enum
 from typing import Any, Optional
 from pydantic import BaseModel, Field, model_validator
 from pydantic_core import PydanticCustomError
-from gui.utils import ERROR
-from model.constants import Coord
-from model.drone import Drone, DroneState
-
+from .constants import Coord
+from .drone import Drone, DroneState
 
 class ZoneType(Enum):
     NORMAL = "normal"
@@ -23,9 +21,9 @@ class Zone(BaseModel):
     coord: Optional[Coord]
     color: Optional[str] = Field(default=None, pattern=r"^[^- ]*$")
     type: ZoneType = Field(default=ZoneType.NORMAL)
-    max_capacity: int = Field(default=1, gt=0)
+    max_occupancy: int = Field(default=1, gt=0)
     drone_count: int = Field(default=0, gt=0)
-    drones: list[Drone] = Field(default_factory=list)
+    drones_by_id: list[str] = Field(default_factory=list)
     connections: list[Coord] = Field(default_factory=list)
 
     def __eq__(self, other: Any) -> bool:
@@ -43,7 +41,7 @@ class Zone(BaseModel):
 class Connection(BaseModel):
     zone_a: str = Field(pattern=r"^[^- ]*$")
     zone_b: str = Field(pattern=r"^[^- ]*$")
-    max_capacity: int = Field(default=1, gt=0)
+    max_link_capacity: int = Field(default=1, gt=0)
     incoming: int = Field(default=0, ge=0)
     outgoing: int = Field(default=0, ge=0)
 
@@ -52,10 +50,7 @@ class Connection(BaseModel):
         if self.zone_a == self.zone_b:
             raise PydanticCustomError(
                 "self_connection",
-                ERROR["connection"]["self_connection"].format(
-                    zone_a=self.zone_a,
-                    zone_b=self.zone_b
-                    )
+                f"Invalid connection: {self.zone_a} and {self.zone_b} are the same hub."
                 )
         return self
 
@@ -71,9 +66,7 @@ class Connection(BaseModel):
         else:
             raise PydanticCustomError(
                 "connection_zone_not_exist",
-                ERROR["connection"]["zone_not_exist"].format(
-                    zone_name=zone_name
-                    )
+                f"Zone name {zone_name} does not exist in this connection."
                 )
 
     def get_zone_names(self) -> tuple[str, str]:
@@ -90,19 +83,22 @@ class FlyinGraph(BaseModel):
     zones # all zones in a set
     connections # all connections in a set
     """
+    filename: str
     drone_count: int = Field(ge=1)
     start_zone: Zone
     end_zone: Zone
-    zones: set[Zone] = Field(default_factory=set)
-    connections: set[Connection]
+    zones: list[Zone] = Field(default_factory=list)
+    connections: list[Connection] = Field(default_factory=list)
    
     @property
     def zone_by_name(self) -> dict[str, Zone]:
-        return {zone.name: zone for zone in self.zones}
+        all_zones = [self.start_zone, self.end_zone] + self.zones
+        return {zone.name: zone for zone in all_zones}
 
     @property
     def zone_by_coord(self) -> dict[Coord, Zone]:
-        return {zone.coord: zone for zone in self.zones}
+        all_zones = [self.start_zone, self.end_zone] + self.zones
+        return {zone.coord: zone for zone in all_zones}
 
     # Model validation after -------------------------------------
     @model_validator(mode="after")
@@ -129,14 +125,14 @@ class FlyinGraph(BaseModel):
         if  all_zones_count != len(unique_names):
             raise PydanticCustomError(
                 "duplicate_hub_names",
-                ERROR["parser"]["duplicate_zone_names"]
+                "Duplicated zone names, review your config file"
             )
 
         unique_coords = {z.coord for z in all_zones}
         if all_zones_count != len(unique_coords):
             raise PydanticCustomError(
                 "duplicate_zone_coords",
-                ERROR["parser"]["duplicate_zone_coords"]
+                "Duplicated zone coordinates, review your config file"
             )
 
         unique_connections = set()
@@ -147,56 +143,54 @@ class FlyinGraph(BaseModel):
             if current_conn in unique_connections:
                 raise PydanticCustomError(
                     "duplicate_connection",
-                    ERROR["connection"]["duplicate_connection"].format(
-                        zone_a=zone_a,
-                        zone_b=zone_b,
-                    )
+                    f"Duplicated connection, review your config file ({zone_a}, {zone_b})",
                 )
-            unique_coords.add(conn)
+            unique_coords.add(current_conn)
 
             if zone_a == zone_b:
                 raise PydanticCustomError(
                     "self_connection",
-                    ERROR["connection"]["self_connection"].format(
-                        zone_a=zone_a,
-                        zone_b=zone_b,
-                    )
+                    f"Invalid connection: {zone_a} and {zone_b} are the same hub."
                 )
 
             for z in [zone_a, zone_b]:
                 if z not in unique_names:
                     raise PydanticCustomError(
                         "connection_zone_not_exist",
-                        ERROR["connection"]["zone_not_exist"].format(zone_name=z)
+                        f"Zone name {z} does not exist in this connection."
                     )
     
         return self
 
     # ---- building ---------------------------------------------------
-    def init_graph(self) -> None:
-        # Each drone needs to start in the start_hub
-        # Each drone needs to have final goal end_hub
-        for i in range(0, self.drone_count + 1):
+    def _create_drones(self) -> None:
+        for i in range(0, self.drone_count):
             id = f"DS{(i + 1)}"
             d = Drone(
-                    id,
-                    DroneState.STOP,
-                    start=self.start_zone,
-                    end=self.end_zone,
-                    current_zone=self.start_zone,
+                    id=id,
+                    state=DroneState.STOP,
+                    start_zone=self.start_zone.name,
+                    end_zone=self.end_zone.name,
+                    current_zone=self.start_zone.name,
                     target=None,
                     move_count=0
                 )
-            self.start_zone.drones.append(d)
-        #Each drone needs to have a field that is an array
-        #of connections it currently has.
+            self.start_zone.drones_by_id.append(d.id)
+
+    def _create_links(self) -> None:
         for conn in self.connections:
             zone_a_name, zone_b_name = conn.get_zone_names()
             zone_a = self.get_zone_by_name(zone_a_name)
             zone_b = self.get_zone_by_name(zone_b_name)
-            zone_a.links.append(conn)
-            zone_b.links.append(conn)
-        
+            zone_a.connections.append(conn)
+            zone_b.connections.append(conn)
+
+    def init_graph(self) -> None:
+        # Each drone needs to start in the start_hub
+        # Each drone needs to have final goal end_hub
+        self._create_drones()
+        self._create_links()
+
     # ---- lookups ----------------------------------------------------
     @property
     def start_zone(self) -> Zone:

@@ -1,6 +1,6 @@
 from abc import ABC
 
-from model import FlyinGraph, Coord
+from src.model import FlyinGraph, Coord
 
 
 class Pathfinding(ABC):

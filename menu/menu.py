@@ -1,12 +1,10 @@
 # src/player/menu.py
 from pathlib import Path
 from typing import List, Union
-from gui.constants import THEME_CHAR, THEME_COLOR, MENU_WIDTH
-from gui.printers import FlyinPrinter
-from gui.utils import UX, hex_to_ansi_fg
-from menu.keys import MenuKey, read_menu_key
-from gui.printers_utils import move_cursor
-from menu.utils import clear_screen
+from gui import FlyinPrinter, \
+    move_cursor_up, \
+    clear_screen
+from .keys import MenuKey, read_menu_key
 
 
 MAPS_ROOT = Path(".")
@@ -106,7 +104,7 @@ class FlyinMenu():
         while True:
             clear_screen()
 
-            print(f"\n{UX['select_map']}\n")
+            print(f"\nSelect the map file to be open\n")
             current_rel = current_dir.relative_to(MAPS_ROOT)
             print(f" 📁 Path: {current_rel}\n")
 
@@ -129,11 +127,11 @@ class FlyinMenu():
                         self.items.append(f"📄 {entry.name}")
                         paths.append(entry.name)
             except PermissionError:
-                print(UX["permission_denied"])
+                print("❌ Permission denied")
                 continue
 
             if len(self.items) == 0:
-                print(UX["no_files_found"])
+                print("❌ No folders or .txt files found")
                 continue
     
             self.items.append("❌  Exit")
@@ -147,7 +145,7 @@ class FlyinMenu():
             idx = None
             while idx is None:
                 menu_height = len(self.active_menu.items)
-                move_cursor(menu_height, 0)
+                move_cursor_up(menu_height)
                 self.printer.print_menu(self.active_menu)
                 idx = self.active_menu.run()
 
@@ -181,8 +179,8 @@ class FlyinMenu():
 
         idx = None
         while idx is None:
-            menu_height = len(self.active_menu.items)
-            move_cursor(menu_height, 0)
+            menu_height = len(self.items)
+            move_cursor_up(menu_height)
             self.printer.print_menu(self.active_menu)
             idx = self.active_menu.run()
 

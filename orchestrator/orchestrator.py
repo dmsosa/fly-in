@@ -1,7 +1,7 @@
 from pydantic import BaseModel, ConfigDict, Field
 
-from model.drone import Drone
-from model.graph import FlyinGraph
+from src.model.drone import Drone
+from src.model.graph import FlyinGraph
 
 
 class Orchestrator(BaseModel):

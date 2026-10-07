@@ -1,5 +1,5 @@
-from model import FlyinGraph, Coord
-from pathfinding.base import Pathfinding
+from src.model import FlyinGraph, Coord
+from src.pathfinding.base import Pathfinding
 
 
 class DijkstraPathfinding(Pathfinding):

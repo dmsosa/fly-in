@@ -1,10 +1,10 @@
 from typing import Any, Optional
 from pydantic import BaseModel, Field
-from gui.constants import UX_STD
-from model import FlyinGraph
-from model.graph import Zone
+from model import FlyinGraph, Zone
 from menu import FlyinMenu
-from .utils import UX_MAX, exit_program
+from .utils import exit_program
+from .constants import UX_MAX, \
+UX_STD
 
 
 DELAY: float = 0.5
@@ -22,6 +22,8 @@ class FlyinGui(BaseModel):
     zone_height: int = Field(default=5, ge=5)
     metadata_height: int = Field(default=2, ge=2)
     margin: int = Field(default=10)
+    min_x: Optional[int] = Field(default=None, ge=0)
+    min_y: Optional[int] = Field(default=None, ge=0)
     row: Optional[int] = Field(default=None, ge=0)
     col: Optional[int] = Field(default=None, ge=0)
 
@@ -30,8 +32,8 @@ class FlyinGui(BaseModel):
             [self.graph.start_zone] + [self.graph.end_zone] + self.graph.zones
         )
 
-        all_x_coords = [zone.coords[0] for zone in self.all_zones]
-        all_y_coords = [zone.coords[1] for zone in self.all_zones]
+        all_x_coords = [zone.coord[0] for zone in self.all_zones]
+        all_y_coords = [zone.coord[1] for zone in self.all_zones]
         max_x = max(all_x_coords)
         min_x = min(all_x_coords)
         max_y = max(all_y_coords)

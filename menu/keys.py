@@ -5,7 +5,7 @@ import sys
 import tty
 import termios
 
-from gui.printers_utils import move_cursor_up
+from gui import move_cursor_up
 
 
 class MenuKey(Enum):

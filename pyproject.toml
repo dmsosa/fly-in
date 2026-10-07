@@ -3,16 +3,35 @@ name = "flying"
 version = "0.1.0"
 description = "Orchestrating drones from start to finish"
 authors = [
-    {name = "durisosa"}
+    {name = "durisosa", email = "jane@example.com"}
 ]
 license = "MIT"
 readme = "README.md"
 requires-python = ">=3.10"
+keywords = ["egg", "bacon", "sausage", "tomatoes", "Lobster Thermidor"]
 dependencies = [
-    "blessed (>=1.50.0,<2.0.0)"
+    "blessed (>=1.50.0,<2.0.0)",
+    "pydantic (>=2.13.5,<3.0.0)"
+]
+repository = "https://github.com/me/spam.git"
+
+[tool.poetry]
+package-mode = false
+
+[tool.poetry.group.test.dependencies]
+pytest = "^9.1.1"
+
+[tool.poetry.group.lint.dependencies]
+mypy = "^2.4.0"
+flake8 = "^7.4.1"
+
+[tool.poetry.group.dev]
+include-groups = [
+    "test",
+    "lint",
 ]
 
-
+[tool.poetry.group.dev.dependencies]
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"

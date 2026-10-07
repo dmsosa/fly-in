@@ -1,5 +1,6 @@
-from gui.utils import ERROR
-from model.drone import Zone
+from typing import Any
+
+from model import Zone
 
 
 class ZoneParseError(Exception):
@@ -13,17 +14,25 @@ class ZoneParser():
         pass
 
     @staticmethod
-    def parse(data_str: str) -> Zone:
-        tokens = data_str.split(" ")
+    def parse(data_str: str) -> dict[str, Any]:
+        zone_type, tokens = data_str.split(":", 1)
         tokens_len = len(tokens)
-        if tokens_len < 1 or tokens_len > 4 or tokens_len < 3:
-            raise ZoneParseError(f"Invalid metadata line for zone '{data_str}'.")
-        name = tokens[0]
+        if tokens_len != 2:
+            raise ZoneParseError(f"Invalid metadata line for zone '{tokens}'.")
+        zone_name = zone_name.strip(": ")
+        zone_data = {
+            "name": zone_name,
+            "coord": None,
+            "zone_type": "normal",
+            "color": None,
+            "max_occupancy": 1
+        }
+        tokens = tokens.strip(" ").split(" ")
         try:
-            coords = (int(tokens[1]), int(tokens[2]))
+            zone_data["coord"] = (int(tokens[1]), int(tokens[2]))
         except ValueError:
             raise ZoneParseError(
-                f"Zone {name} received invalid \
+                f"Zone {zone_data['name']} received invalid \
                 coordinates: ({tokens[1]}, {tokens[2]})"
                 )
         if tokens_len == 4:
@@ -32,23 +41,18 @@ class ZoneParser():
             if valid_metadata:
                 metadata = last_token.strip("[]")
                 metadata_tokens = metadata.split(" ")
-                zone_type = None
-                color = None
-                max_drones = 1
                 for token in metadata_tokens:
                     parts = token.split("=")
                     if len(parts) != 2:
                         raise ZoneParseError(f"Invalid metadata token '{token}'.")
                     key, value = parts
                     if key == "color":
-                        color = value
+                        zone_data["color"] = value
                     elif key == "max_drones":
-                        max_drones = value
+                        zone_data["max_occupancy"] = value
                     elif key == "zone":
-                        zone_type = value
+                        zone_data["zone_type"] = value
                     else:
                         raise ZoneParseError(f"Metadata key for zone '{key}' not recognized.")
-        
-        new_zone = Zone(name, coords, color, zone_type, max_drones)
-        
-        return new_zone
+    
+        return zone_data

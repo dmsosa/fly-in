@@ -1,8 +1,9 @@
 from enum import Enum, auto
-from git import Optional
+from typing import TYPE_CHECKING, Optional
 from pydantic import BaseModel, ConfigDict, Field
-from .graph import Zone
 
+if TYPE_CHECKING:
+    from .graph import Zone
 
 class DroneState(Enum):
     FLYING = auto()
@@ -27,14 +28,15 @@ class Drone(BaseModel):
 
     id: str
     state: DroneState = Field(default=DroneState.STOP)
-    start: Optional[Zone] = Field(default=None)
-    end: Optional[Zone] = Field(default=None)
-    current_zone: Optional[Zone] = Field(default=None)
-    target: Optional[Zone] = Field(default=None)
+    start_zone: str
+    end_zone: str
+    current_zone: Optional[str] = Field(default=None)
+    target_zone: Optional[str] = Field(default=None)
     move_count: int = Field(default=0)
 
-    def begin_move(self, to: Zone) -> None:
+    def begin_move(self, to: str) -> None:
         self.current_zone = None
         if to.max_capacity == to.drone_count:
-            self.status = DroneState.WAIT
-        self.state = DroneState.FLYING
+            self.state = DroneState.WAIT
+        else:
+            self.state = DroneState.FLYING

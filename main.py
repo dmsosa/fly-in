@@ -1,11 +1,12 @@
 import sys
+import traceback
 
 from pydantic import ValidationError
 
 from error.error import FlyinParseError
 from gui.gui import FlyinGui
 from gui.utils import exit_program, wait_for_enter
-from menu import FlyinMenu, ERROR
+from menu import FlyinMenu
 from gui import FlyinPrinter
 from gui.printers_utils import clear_screen, should_use_ansi, supports_ansi
 from model.graph import FlyinGraph
@@ -29,6 +30,7 @@ def parse_and_init_graph(config_file: str, parser: FlyinParser) -> None:
     except Exception as e:
         print("An unexpected error occurred.")
         print(f"   └── {e}\n")
+        traceback.print_exc(file=sys.stderr)
         sys.exit(1)
 
     graph = None
@@ -52,6 +54,7 @@ def parse_and_init_graph(config_file: str, parser: FlyinParser) -> None:
     except Exception as e:
         print("An unexpected error occurred.")
         print(f"   └── {e}\n")
+        traceback.print_exc(file=sys.stderr)
         wait_for_enter(None)
         exit_program()
 
@@ -78,12 +81,13 @@ def main() -> None:
     printer.is_ansi = is_ansi
     printer.print_presentation()
 
-    menu = FlyinMenu()
+    menu = FlyinMenu(printer)
     parser = FlyinParser()
     while True:
         while True:
             if config_file_arg is None:
-                config_file = menu.run_select_path_menu()
+                menu.run_select_path_menu()
+                config_file = menu.get_path_to_config()
             else:
                 config_file = config_file_arg 
             config_file_arg = None
@@ -93,14 +97,16 @@ def main() -> None:
             if not graph:
                 continue
 
-            gui = FlyinGui(graph)
-            if gui.confirm_map_file(menu):
+            gui = FlyinGui(graph=graph)
+            print("")
+            if gui.confirm_map_file(graph.filename, menu):
                 break
 
 
         # What I need to start another simulation ... ?
         # Know if the user wants to do it, handled by try_again Menu
         # 
+
         try_again = printer.print_try_again()
         if try_again == 0:
             continue

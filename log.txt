@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/home/durisosa/work/repos-official/flying/main.py", line 19, in parse_and_init_graph
+    graph_data = parser.parse(config_file)
+  File "/home/durisosa/work/repos-official/flying/parser/parser.py", line 72, in parse
+    new_zone = ZoneParser.parse(data)
+  File "/home/durisosa/work/repos-official/flying/parser/zone_parser.py", line 21, in parse
+    raise ZoneParseError(f"Invalid metadata line for zone '{tokens}'.")
+parser.zone_parser.ZoneParseError: Invalid metadata line for zone '['junction', '1', '0', '[color=yellow', 'max_drones=2]']'.

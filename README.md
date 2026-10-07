@@ -75,3 +75,30 @@ have a method "next_turn" that returns the next movement a drone has done, which
 How can I implement this, but with my own simple algorithm that send the drones each time through the next connection which has fewer occupancy?
 
 update the state of my network
+
+
+for the pathfinding part of my project, I have a orchestrator class, which is going to receive a graph already built by the config.txt parser.
+
+The FlyinOrchestrator class receives a graph, in its init method it sets the folowing fields *they also need to be declared with pdantic*  self._graph = graph
+self.drones = self.graph.start_zone.drones
+
+
+it has a method simulation_turn, which is going to return me a single movement that  a drone decided to do. 
+
+the simulation ends when: orchestrator . check_end() method, which iterates over each of self.drones and returns False if for one drone, Drone.finished() is False
+
+the thing is, I dont know how to make my simulator to dont lose its state, and being able to return each time the next movement that a drone executed, modifying the drones within the graph, and nothing else.
+Drone has a method _start_move which modify its state to drone.State.fLYIN, sets its current_zone to None.
+
+there is another pacage pathfinding, which allows me to choose the best path taking into account distance *manhattan distance*
+
+Pathfinder base class has a pathfinderAstar implementation. 
+which is the one we are going to focus on, this greedy is going to choose the cheapest zone depending on manhattan distance, , connection usage, sinc
+
+PathfinderAstar:
+
+method find_path() receives a starting_zone,  end_zone, returns an array of zones. 
+
+current_zone = start
+
+while 
