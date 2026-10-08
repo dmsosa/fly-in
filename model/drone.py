@@ -1,9 +1,7 @@
 from enum import Enum, auto
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
 
-if TYPE_CHECKING:
-    from .graph import Zone
 
 class DroneState(Enum):
     FLYING = auto()

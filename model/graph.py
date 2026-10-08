@@ -1,9 +1,16 @@
 from enum import Enum
+from functools import lru_cache
 from typing import Any, Optional
 from pydantic import BaseModel, Field, model_validator
 from pydantic_core import PydanticCustomError
 from .constants import Coord
 from .drone import Drone, DroneState
+
+class HubType(Enum):
+    HUB = "hub"
+    START = "start"
+    END = "end"
+
 
 class ZoneType(Enum):
     NORMAL = "normal"
@@ -21,7 +28,8 @@ class Zone(BaseModel):
     coord: Optional[Coord]
     color: Optional[str] = Field(default=None, pattern=r"^[^- ]*$")
     type: ZoneType = Field(default=ZoneType.NORMAL)
-    max_occupancy: int = Field(default=1, gt=0)
+    hub_type: HubType = Field(default=HubType.HUB)
+    max_drones: int = Field(default=1, gt=0)
     drone_count: int = Field(default=0, gt=0)
     drones_by_id: list[str] = Field(default_factory=list)
     connections: list[Coord] = Field(default_factory=list)
@@ -89,16 +97,13 @@ class FlyinGraph(BaseModel):
     end_zone: Zone
     zones: list[Zone] = Field(default_factory=list)
     connections: list[Connection] = Field(default_factory=list)
-   
-    @property
-    def zone_by_name(self) -> dict[str, Zone]:
-        all_zones = [self.start_zone, self.end_zone] + self.zones
-        return {zone.name: zone for zone in all_zones}
+    drones: dict[str, Drone] = Field(default_factory=dict)
 
-    @property
-    def zone_by_coord(self) -> dict[Coord, Zone]:
-        all_zones = [self.start_zone, self.end_zone] + self.zones
-        return {zone.coord: zone for zone in all_zones}
+    def get_zone_by_name(self, name: str) -> Zone | None:
+        return self._zones_by_name.get(name)
+
+    def get_zone_by_coord(self, name: str) -> Zone | None:
+        return self._zones_by_name.get(name)
 
     # Model validation after -------------------------------------
     @model_validator(mode="after")
@@ -145,7 +150,7 @@ class FlyinGraph(BaseModel):
                     "duplicate_connection",
                     f"Duplicated connection, review your config file ({zone_a}, {zone_b})",
                 )
-            unique_coords.add(current_conn)
+            unique_connections.add(current_conn)
 
             if zone_a == zone_b:
                 raise PydanticCustomError(
@@ -175,6 +180,7 @@ class FlyinGraph(BaseModel):
                     target=None,
                     move_count=0
                 )
+            self.drones[d.id] = d
             self.start_zone.drones_by_id.append(d.id)
 
     def _create_links(self) -> None:
@@ -185,9 +191,23 @@ class FlyinGraph(BaseModel):
             zone_a.connections.append(conn)
             zone_b.connections.append(conn)
 
+    def _build_indexes(self) -> None:
+        all_zones = [self.start_zone, self.end_zone] + self.zones
+
+        self._zones_by_name = {
+            zone.name: zone
+            for zone in all_zones
+        }
+
+        self._zones_by_coord = {
+            zone.coord: zone
+            for zone in all_zones
+        }
+
     def init_graph(self) -> None:
         # Each drone needs to start in the start_hub
         # Each drone needs to have final goal end_hub
+        self._build_indexes()
         self._create_drones()
         self._create_links()
 
@@ -208,14 +228,12 @@ class FlyinGraph(BaseModel):
 
     def get_zone_by_name(self, name: str) -> Zone | None:
         """O(1) lookup by name."""
-        return self.zone_by_name.get(name)
+        return self._zones_by_name.get(name)
 
     def get_zone_by_coord(self, coord: tuple[int, int]) -> Zone | None:
         """Linear lookup by (x, y); None if no zone is there."""
-        for zone in self.zones:
-            if zone.coord == coord:
-                return zone
-        return None
+        return self._zones_by_coord.get(coord)
+
 
     def get_connections_for_zone(self, zone: Zone) -> set[Connection]:
         """Connections touching `zone` (empty set if unknown)."""

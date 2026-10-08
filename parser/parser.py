@@ -69,18 +69,23 @@ class FlyinParser:
                 raise FlyinParseError(f"Key for parser not recognized: '{key}'. [Line: {row + 1}]")
 
             if key == "hub":
-                new_zone = ZoneParser.parse(data)
-                result_dict["zones"].append(new_zone)
+                zone_data = ZoneParser.parse(data)
+                zone_data["hub_type"] = "hub"
+                result_dict["zones"].append(zone_data)
             elif key == "start_hub":
                 if result_dict["start_zone"] is not None:
                     raise FlyinParseError("There must be exactly one start_hub")
-                new_zone = ZoneParser.parse(data)
-                result_dict["start_zone"] = new_zone
+                zone_data = ZoneParser.parse(data)
+                zone_data["hub_type"] = "start"
+                zone_data["max_drones"] = result_dict["drone_count"]
+                result_dict["start_zone"] = zone_data
             elif key == "end_hub":
                 if result_dict["end_zone"] is not None:
                     raise FlyinParseError("There must be exactly one end_hub")
-                new_zone = ZoneParser.parse(data)
-                result_dict["end_zone"] = new_zone
+                zone_data = ZoneParser.parse(data)
+                zone_data["hub_type"] = "end"
+                zone_data["max_drones"] = result_dict["drone_count"]
+                result_dict["end_zone"] = zone_data
             elif key == "connection":
                 conn = ConnectionParser.parse(data)
                 result_dict["connections"].append(conn)
