@@ -36,8 +36,14 @@ def parse_and_init_graph(config_file: str, parser: FlyinParser) -> None:
     graph = None
     try:
         graph = FlyinGraph(**graph_data)
-        # This parser is going to build what? a config object or a class directly?
-        # It reads line by line, if it is a nb_drones line, assign the nb_drones. if it has start_hub, end_hub or hub
+        # This parser is going to build what? a dict
+        # the dict then is used to instantiate the graph using
+        # Pydantic validations.
+
+        # The graph starts with all drones in the start node
+        # It also modifies zone objects to give value to its
+        # self.connections Attribute. Which is an array of
+        # connections that zones has.
         graph.init_graph()
     
     except ValidationError as e:
@@ -98,19 +104,24 @@ def main() -> None:
                 continue
 
             gui = FlyinGui(graph=graph)
-            print("")
             if gui.confirm_map_file(graph.filename, menu):
                 break
+            orchestrator = Orchestrator(graph)
+            while orchestrator.drones_finished < orchestrator.drones_count:
+                turn_str = orchestrator.next_turn()
+                # the first step to be able to move all drones is to move a single drone, one at the time
+                # one drone is going to cose the shortest path everytime, it wil no reach dead ends because I can already discard them with the heuristic function
+                orchestrator.output_turn(turn_str)
 
 
         # What I need to start another simulation ... ?
         # Know if the user wants to do it, handled by try_again Menu
         # 
 
-        try_again = printer.print_try_again()
-        if try_again == 0:
+        try_again = input("try aain")
+        if try_again == "si":
             continue
-        elif try_again == -1:
+        elif try_again == "no":
             break
         else:
             continue

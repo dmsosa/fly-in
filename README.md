@@ -1,3 +1,62 @@
+|  _This project has been created as part
+of the 42 curriculum by durisosa_.
+
+# Description
+
+What if you are leading a swarm of drones from an origin coordinate (x, y) and you want to send all of them to the end coordinate (xf, yf) in as less movements as possible? If it were so, it would be enough to just send each drone and change its coordinates one step at the time to follow the shortest path from Origin to the Destination.
+
+But things are more complicated than that, since each zone has some constraints:
+
+Zone:
+---> Priority: It indicates its preference over other kind of zones
+---> Max_drones: Maximum amount of drones it can hold at the same time
+
+Connections:
+---> Max_link_capacity: how many drones can travel through the same connection, this means, how many drones you can send from A to B in the same turn.
+
+Ok, let's say you can do this part well, now let's repeat the parts this project needs to have:
+
+A fully working simulation written in Python, including:
+• A parser for the input file format. *<done>*
+• A simulation engine respecting movement and zone rules. *--todo 
+• A pathfinding algorithm (or multiple) capable of minimizing total turns. *--todo 
+• A visual representation system (terminal colors and/or graphical interface). *--todo 
+• A terminal or log output that follows the specified format. *--todo 
+
+
+For me, the challenge in this project is that this is not just a simple find-shortest-path problem, but you actually need to take into account the constraints in each turn before actually moving the drone.
+
+I need an efficient way to
+0. Precalculate distance from end to origin,  or vice-versa, to force myself to master heuristics. 
+1. Check possible links, discarding restricted zones or dead_ends
+2. Check if the next position I pretend to visit is available, and if its link is available. 
+A link is available if and only if is current entering drones and current leaving drones are less than its maximum capacity. 
+A zone is available if and only if its current drone_count is less than its maximum capacity.
+3. That way, I can construct an array of coordinates to follow.
+
+This is what barra does:
+
+He finds all possible paths from each cell to the end
+
+Then when assigning that path to a drone, it starts filtering them, depending on which paths have space available, which have links available, and taking the intersection of both sets to get a list of valid paths.
+
+It also gets the paths that lead to a zone with priority, but it does not calculate costs or uses distances.
+
+it finally chooses the path by getting the first one that was retrieved. Update drones "target", "remaining turns" and current_path fields, so that it is ready to call the _move_to() method again.
+
+This simulators can print when  it is doing something, including when it is "evaluating" a drone to be moved, because it returns some results without losing the state, but is possible to do this without a generator?
+
+For that reason, we need a method called _move_to, which is going to change the drone state from STOP to FLYIN if it can move, or to WAIT if it can not for connection or zone maximum capacity being reached. 
+
+It is obvious that we need a bigger object which provides access to all drones, to all zones, and connections, we will call it Orchestrator. The Orchestrator is in charge of determining if a drone can move, and after each turn it has the method of providing it current state as an output, to be able to print it or write it to a file.
+
+lso, so, since I have some metrics like total+path+cost, which is he cost of each path, I can have a Path object which has a cost, a Path object should have an Origin, Destiny, list of Zones
+
+method path.get_cost() 
+
+for z in self.zones, sum = z.get_cost(). But this would only work if the cost depends on the distance, but if cost depends on occupancy, a path cost can be different from a moment of the iteration to another
+ This is the Fly-in project. 
+
 # Developer's forewords
 
 How can I start to implement my drones to be able to code them and start the flying?

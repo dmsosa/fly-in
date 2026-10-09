@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class DroneState(Enum):
-    FLYING = auto()
+    FLYIN = auto()
     WAIT = auto()
     STOP = auto()
 

@@ -25,14 +25,14 @@ class Zone(BaseModel):
         it can hold Drones, keep track of its possible connections
     """
     name: str = Field(pattern=r"^[^- ]*$")
-    coord: Optional[Coord]
+    coord: Coord
     color: Optional[str] = Field(default=None, pattern=r"^[^- ]*$")
     type: ZoneType = Field(default=ZoneType.NORMAL)
     hub_type: HubType = Field(default=HubType.HUB)
     max_drones: int = Field(default=1, gt=0)
     drone_count: int = Field(default=0, gt=0)
     drones_by_id: list[str] = Field(default_factory=list)
-    connections: list[Coord] = Field(default_factory=list)
+    connections: list["Connection"] = Field(default_factory=list)
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, Zone):
@@ -45,13 +45,18 @@ class Zone(BaseModel):
     def get_zone_cost(self) -> float:
         return float("inf")
 
+    def get_adjacent_zones(self) -> list["Zone"]:
+        adjacent = []
+        for conn in self.connections:
+            opposite = conn.get_opposite(self.name)
+            adjacent.append(opposite)
+        return adjacent
+
 
 class Connection(BaseModel):
-    zone_a: str = Field(pattern=r"^[^- ]*$")
-    zone_b: str = Field(pattern=r"^[^- ]*$")
+    zone_a: str
+    zone_b: str
     max_link_capacity: int = Field(default=1, gt=0)
-    incoming: int = Field(default=0, ge=0)
-    outgoing: int = Field(default=0, ge=0)
 
     @model_validator(mode="after")
     def not_circular_connection(self) -> "Connection":
@@ -63,7 +68,7 @@ class Connection(BaseModel):
         return self
 
     @property
-    def key(self) -> frozenset[Coord]:
+    def key(self) -> frozenset[tuple[str, str]]:
         return frozenset((self.zone_a, self.zone_b))
 
     def get_opposite(self, zone_name: str) -> str:
@@ -97,13 +102,7 @@ class FlyinGraph(BaseModel):
     end_zone: Zone
     zones: list[Zone] = Field(default_factory=list)
     connections: list[Connection] = Field(default_factory=list)
-    drones: dict[str, Drone] = Field(default_factory=dict)
 
-    def get_zone_by_name(self, name: str) -> Zone | None:
-        return self._zones_by_name.get(name)
-
-    def get_zone_by_coord(self, name: str) -> Zone | None:
-        return self._zones_by_name.get(name)
 
     # Model validation after -------------------------------------
     @model_validator(mode="after")
@@ -168,20 +167,6 @@ class FlyinGraph(BaseModel):
         return self
 
     # ---- building ---------------------------------------------------
-    def _create_drones(self) -> None:
-        for i in range(0, self.drone_count):
-            id = f"DS{(i + 1)}"
-            d = Drone(
-                    id=id,
-                    state=DroneState.STOP,
-                    start_zone=self.start_zone.name,
-                    end_zone=self.end_zone.name,
-                    current_zone=self.start_zone.name,
-                    target=None,
-                    move_count=0
-                )
-            self.drones[d.id] = d
-            self.start_zone.drones_by_id.append(d.id)
 
     def _create_links(self) -> None:
         for conn in self.connections:
@@ -199,66 +184,12 @@ class FlyinGraph(BaseModel):
             for zone in all_zones
         }
 
-        self._zones_by_coord = {
-            zone.coord: zone
-            for zone in all_zones
-        }
-
-    def init_graph(self) -> None:
-        # Each drone needs to start in the start_hub
-        # Each drone needs to have final goal end_hub
+    def model_post_init(self, context: Any) -> None:
         self._build_indexes()
-        self._create_drones()
         self._create_links()
 
     # ---- lookups ----------------------------------------------------
-    @property
-    def start_zone(self) -> Zone:
-        """The unique start zone."""
-        if self._start is None:
-            raise ValueError("No start_hub defined")
-        return self._start
-
-    @property
-    def end_zone(self) -> Zone:
-        """The unique end zone."""
-        if self._end is None:
-            raise ValueError("No end_hub defined")
-        return self._end
-
     def get_zone_by_name(self, name: str) -> Zone | None:
         """O(1) lookup by name."""
         return self._zones_by_name.get(name)
 
-    def get_zone_by_coord(self, coord: tuple[int, int]) -> Zone | None:
-        """Linear lookup by (x, y); None if no zone is there."""
-        return self._zones_by_coord.get(coord)
-
-
-    def get_connections_for_zone(self, zone: Zone) -> set[Connection]:
-        """Connections touching `zone` (empty set if unknown)."""
-        return self.graph.get(zone, set())
-
-    def get_connections_for_coord(
-        self, coord: tuple[int, int]
-    ) -> set[Connection]:
-        """Connections touching the zone located at `coord`."""
-        zone = self.get_zone_by_coord(coord)
-        return self.get_connections_for_zone(zone) if zone else set()
-
-    def get_connection_by_coord(
-        self, a: tuple[int, int], b: tuple[int, int]
-    ) -> Connection | None:
-        """Connection between the zones at `a` and `b`, in any order."""
-        for conn in self.connections:
-            if {conn.origin.coord, conn.destination.coord} == {a, b}:
-                return conn
-        return None
-
-    def get_neighbors(self, zone: Zone) -> list[Zone]:
-        """Adjacent zones a drone may enter (blocked ones excluded)."""
-        return [
-            conn.other_end(zone)
-            for conn in self.get_connections_for_zone(zone)
-            if not conn.other_end(zone).is_blocked
-        ]
