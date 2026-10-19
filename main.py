@@ -5,12 +5,15 @@ from pydantic import ValidationError
 
 from error.error import FlyinParseError
 from gui.gui import FlyinGui
+from gui.terminal_gui import TerminalGui
 from gui.utils import exit_program, wait_for_enter
 from menu import FlyinMenu
 from gui import FlyinPrinter
-from gui.printers_utils import clear_screen, should_use_ansi, supports_ansi
+from gui.terminal_utils import clear_screen, should_use_ansi, supports_ansi
 from model.graph import FlyinGraph
+from orchestrator.orchestrator import Orchestrator
 from parser import FlyinParser
+from pathfinding.dijkstra import DijkstraPathfinding
 
 
 def parse_and_init_graph(config_file: str, parser: FlyinParser) -> None:
@@ -36,16 +39,6 @@ def parse_and_init_graph(config_file: str, parser: FlyinParser) -> None:
     graph = None
     try:
         graph = FlyinGraph(**graph_data)
-        # This parser is going to build what? a dict
-        # the dict then is used to instantiate the graph using
-        # Pydantic validations.
-
-        # The graph starts with all drones in the start node
-        # It also modifies zone objects to give value to its
-        # self.connections Attribute. Which is an array of
-        # connections that zones has.
-        graph.init_graph()
-    
     except ValidationError as e:
         clear_screen()
         print("Exception while creating graph class.")
@@ -85,13 +78,14 @@ def main() -> None:
     is_ansi = should_use_ansi()
     printer = FlyinPrinter()
     printer.is_ansi = is_ansi
-    printer.print_presentation()
+
 
     menu = FlyinMenu(printer)
     parser = FlyinParser()
     while True:
         while True:
             if config_file_arg is None:
+                printer.print_presentation()
                 menu.run_select_path_menu()
                 config_file = menu.get_path_to_config()
             else:
@@ -104,14 +98,19 @@ def main() -> None:
                 continue
 
             gui = FlyinGui(graph=graph)
-            if gui.confirm_map_file(graph.filename, menu):
+
+            if not gui.confirm_map_file(graph.filename, menu):
                 break
-            orchestrator = Orchestrator(graph)
-            while orchestrator.drones_finished < orchestrator.drones_count:
-                turn_str = orchestrator.next_turn()
-                # the first step to be able to move all drones is to move a single drone, one at the time
-                # one drone is going to cose the shortest path everytime, it wil no reach dead ends because I can already discard them with the heuristic function
-                orchestrator.output_turn(turn_str)
+
+            pathfinding = DijkstraPathfinding(graph)
+            orchestrator = Orchestrator(graph=graph, pathfinding=pathfinding)
+            history = orchestrator.run_orchestra()
+            orchestrator.export_turns()
+
+            terminal_gui = TerminalGui(graph, orchestrator.reservation_table, history)
+            terminal_gui.print_history()
+            input()
+            
 
 
         # What I need to start another simulation ... ?

@@ -1,0 +1,9 @@
+*.py[cod]
+*$py.class
+.vscode/
+venv/
+.venv/
+**/poetry.lock
+dist/
+static/
+__pycache__/

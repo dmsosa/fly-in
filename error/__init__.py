@@ -1,6 +1,8 @@
-from .error import FlyinParseError
+from .error import FlyinParseError, \
+FlyinError
 
 
 __all__ = [
-    "FlyinParseError"
+    "FlyinParseError",
+    "FlyinError",
 ]

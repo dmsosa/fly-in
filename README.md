@@ -119,7 +119,7 @@ It iterates through each drone. It moves, so it needs the next_zone's position a
 
 When I use the connections, actually? That is to optimize and move more than one drone through the same connection in the same turn.
 
-Also, Drone can have their status, waiting, moving or stopped, and it is going to reflect ont he gui.
+Also, Drone can have their status, waiting, moving or stopped, and it is going to reflect on the gui.
 
 # Chapter 2:
 
@@ -154,10 +154,94 @@ there is another pacage pathfinding, which allows me to choose the best path tak
 Pathfinder base class has a pathfinderAstar implementation. 
 which is the one we are going to focus on, this greedy is going to choose the cheapest zone depending on manhattan distance, , connection usage, sinc
 
-PathfinderAstar:
+PathfindingDjikstra:
 
-method find_path() receives a starting_zone,  end_zone, returns an array of zones. 
+This pathfinding pre-calculates a distanceMap in its init method
+after that, the pathfinding has a method find_best_zone(zone) receives a zone and returns the best zone that the drone can access to, taking into account distance, and occupancy costs. It returns a Zone or None, in case there is no best movement, which means all neighbors have a distance bigger than current_zone's distance, or are all of them occupied.
 
-current_zone = start
 
-while 
+# Chapter 3
+
+## The flow of the program
+
+after the config file has been parsed, I buid a graph out of it, which fields include the total number of rones, the zones and connections (which are other objects). It has a very important method get_zone_by_names(zone_a, zone_b) which is going to find and return a zone in which both zone_a and zone_b are included.
+
+After that, the pathfinding algorithm is initialized with the graph only, it's task is to build a distanceMap from end to finish. Then it uses it to have a find_best_zone method, which returns the zone which less distance from the current_zone. 
+
+Then, the orchestrator is initialized with the given graph and pathfinding
+
+Orchestrator is going to return a 2D list of Moves, which will be used to export the output.txt and the render can also use it to render the graph and its moves graphically.
+
+Orchestrator generates the 2D list of Moves with its method run, which iterates over each drone while NOT all drones have been delivered *Marked with DELIVERED state*, when I take a drone, the first question is to ask which is its zone with less distance to the end, but if I return a single zone from pathfinding, without taking into account occupancies already, I wont be able to pick a zone with bigger distance when other neighbors get  a higher score because of occupancy constraints 
+
+# Chapter 4 - October 14
+
+When a drone moves, the following actions are to be done:
+
+The DRONE itself does not care about occupancy or connection constraints.
+
+
+1. Set current_zone to None, since the drone is leaving it
+2. Set target_zone to the next zone that was found by the pathfinding algorithm
+3. Update zone's counts.
+4. Update connection's counts.
+
+Taking into account the bonus,  I need to be able to add a flag.
+That flag is a boolean, which when set to true
+For each turn
+For each zone, print its current occupancy.
+For each connection, print its max link capacity.
+
+
+# Chapter 5 - October 14
+
+1. If the pathfinding just suggest the shortest path without taking into account occupancies, the orchestrator is going to reject that movements
+2. Now, how to make the orchestrator take care of the occupancy, link usage and at the same time, keep asking the pathfinding to another route if the last one was not available.
+3. It is not possible, so if the pathfinding returns me an array of possible zones, I can iterate over them. They need to be ranked, so I keep even the one with lowest score. And the score depends on occupancy, priority and type of zone, preferring NORMAL or PRIORITY ones over RESTRICTED zones.
+
+#  Chapter 6 - October 15
+
+for taking into account more than one one, I need to access my current zone, and then its neighbours.
+
+for n in current_zone.neighbors:
+    I want to preverse every node which distance is lower than my current one.
+
+    Let's call that function "get_shorther_nodes"
+    once I have the shorther nodes, I filte out the ones whose connection is fully occupied or which zone is occupied itself. Then I want to take the one with less ocupancy, cost = pathfinding.distance_map[neighbor.name] + neighbor.occupancy. 
+
+The pathfinding needs to do the following: take the current zone and find its neighbors. Once it has its neigbors, it is going to  calclate its current score with occupancy, so I need the Zone object itself, not  just its distance
+
+
+### For this purpose, the tools that my  orchestrator needs to have is:
+
+- A way  to keep track of zone's occupancies
+    --- uses the drone.current_zone and current_zone.connections attributes.
+- A way to get connection occuppancies.
+    --- uses the normalized name of the connection (A, B) and (B,  A) are both equal to (A, B)
+    for that, it is going to use the method self.graph.get_connection(zone_a, zone_b), it sorts both strings in a tuple and uses the dictionary self.graph.conn_by_names
+    the advantage is that I dont create a frozenset, and is not only a conn_usag dict, but a dict with all connection  information.
+- With this two, I can already determine if a zone is fully occupied or not
+
+
+# Chapter 6 
+
+Printing movements:
+
+If drone moves to  normal zone, the output of the movement MUST be formatted in the following way: 
+
+"D{id}-{targetZone}" 
+if movement is to restricted zone: "D{id}-{zoneA}_{zoneB}"
+
+For giving output to the printer, the disavantage of using move 2D array is like printing each move to string, and after the move its details, if I have a snaptshot of what happens in each turn, would be like
+
+In a turn, I have a list of movements, 
+a map of zoones and their occupancy at that moment
+a map of edges and their occupancy
+
+that would be created by the pathfinder?
+
+then the orchestrator only needs to e 
+
+It turns out that it is, in fact, possible to execute the minimum amount of movements leadin the drones with a greedy behaviour, but, how is it possible to print after each turn of moves, the corresponding zone occupancy and connection usage?
+
+By, after a movement row, D1-dest1 D2-dest2

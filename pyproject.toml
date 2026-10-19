@@ -11,7 +11,8 @@ requires-python = ">=3.10"
 keywords = ["egg", "bacon", "sausage", "tomatoes", "Lobster Thermidor"]
 dependencies = [
     "blessed (>=1.50.0,<2.0.0)",
-    "pydantic (>=2.13.5,<3.0.0)"
+    "pydantic (>=2.13.5,<3.0.0)",
+    "pytest (>=9.1.1,<10.0.0)"
 ]
 repository = "https://github.com/me/spam.git"
 
@@ -35,3 +36,7 @@ include-groups = [
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

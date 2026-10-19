@@ -81,10 +81,8 @@ def read_boolean_key() -> bool:
         if key is MenuKey.DOWN:
             idx = (idx + 1) % 2
         if key is MenuKey.SELECT:
-            new_value = bools[idx]
-            return new_value
+            return bools[idx]
         if key is MenuKey.EXIT:
             break
         move_cursor_up(3)
-    msg = "Cancelled the select boolean operation"
-    raise ValueError(msg)
+    print(f"Cancelled the select boolean operation")

@@ -2,6 +2,7 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field
 from model import FlyinGraph, Zone
 from menu import FlyinMenu
+from orchestrator.orchestrator import Move
 from .utils import exit_program
 from .constants import UX_MAX, \
 UX_STD
@@ -12,42 +13,40 @@ FAST: float = 0.1
 DIRECT: float = 0.0
 
 
-class FlyinGui(BaseModel):
+class FlyinGui:
     """
     Graphical User Interface for Fly-in
     """
-    graph: FlyinGraph
-    all_zones: list[Zone] = Field(default_factory=list)
-    zone_width: int = Field(default=15, ge=10)
-    zone_height: int = Field(default=5, ge=5)
-    metadata_height: int = Field(default=2, ge=2)
-    margin: int = Field(default=10)
-    min_x: Optional[int] = Field(default=None, ge=0)
-    min_y: Optional[int] = Field(default=None, ge=0)
-    row: Optional[int] = Field(default=None, ge=0)
-    col: Optional[int] = Field(default=None, ge=0)
-
-    def model_post_init(self, __context: Any) -> None:
+    def __init__(self, graph: FlyinGraph) -> None:
+        self.graph = graph
+        # self.zone_width: int = Field(default=15, ge=10)
+        # self.zone_height: int = Field(default=5, ge=5)
+        # self.metadata_height: int = Field(default=2, ge=2)
+        # self.margin: int = Field(default=10)
+        # self.min_x: Optional[int] = Field(default=None, ge=0)
+        # self.min_y: Optional[int] = Field(default=None, ge=0)
+        # self.row: Optional[int] = Field(default=None, ge=0)
+        # self.col: Optional[int] = Field(default=None, ge=0)
         self.all_zones = (
             [self.graph.start_zone] + [self.graph.end_zone] + self.graph.zones
         )
 
-        all_x_coords = [zone.coord[0] for zone in self.all_zones]
-        all_y_coords = [zone.coord[1] for zone in self.all_zones]
-        max_x = max(all_x_coords)
-        min_x = min(all_x_coords)
-        max_y = max(all_y_coords)
-        min_y = min(all_y_coords)
+        # all_x_coords = [zone.coord[0] for zone in self.all_zones]
+        # all_y_coords = [zone.coord[1] for zone in self.all_zones]
+        # max_x = max(all_x_coords)
+        # min_x = min(all_x_coords)
+        # max_y = max(all_y_coords)
+        # min_y = min(all_y_coords)
 
-        self.min_x = min_x
-        self.min_y = min_y
+        # self.min_x = min_x
+        # self.min_y = min_y
 
-        width = (max_x - min_x + 1) * self.zone_width + self.margin * 2
-        height = (max_y - min_y + 1) * (
-            self.zone_height + self.metadata_height
-        ) + self.margin * 2
+        # width = int(max_x - min_x + 1) * self.zone_width + self.margin * 2
+        # height = (max_y - min_y + 1) * (
+        #     self.zone_height + self.metadata_height
+        # ) + self.margin * 2
 
-        self.col, self.row = width, height
+        self.col, self.row = 15, 15
         pass
 
     
@@ -82,3 +81,23 @@ class FlyinGui(BaseModel):
             exit_program()
 
         return False
+
+    def print_history(self) -> None:
+        lines = []
+        for turn_number, turn in enumerate(self.history):
+            line = []
+            for move in turn:
+                is_connection_move = move.restricted
+                if is_connection_move:
+                    color = self.theme_ascii["connection"]
+                else:
+                    dest_zone = self.graph.get_zone_by_name(move.dest)
+                    zone_color = dest_zone.color
+                    color = self.theme_ascii.get(zone_color, self.theme_ascii["white"])
+                line.append(f"T{turn_number}: {color}{move.to_str()}{RESET}")
+                if self.verbose:
+                    line.append()
+            lines.append(line)
+
+        for l in lines:
+            print(" ".join(line))

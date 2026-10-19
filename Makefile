@@ -7,18 +7,24 @@ RED := \033[31m
 BLUE := \033[34m
 WHITE := \033[97m
 
-PROJECT := fly-in
+PROJECT := Fly-in
+NAME    := main.py
+MAP     ?= maps/easy/01_linear_path.txt
+ARGS    ?=
 
-.PHONY: install install-req run debug clean lint lint-strict help
+.PHONY: install install-req run debug test clean lint lint-strict help
+
+all: run
 
 help:
 	@printf "\n$(BOLD)$(CYAN)╔══════════════════════════════════════╗$(RESET)\n"
-	@printf "$(BOLD)$(CYAN)║ $(WHITE)$(PROJECT)$(CYAN) ║$(RESET)\n"
+	@printf "$(BOLD)$(CYAN)║ $(WHITE)$(PROJECT)$(CYAN)                               ║$(RESET)\n"
 	@printf "$(BOLD)$(CYAN)╚══════════════════════════════════════╝$(RESET)\n\n"
 	@printf "$(GREEN)make install$(RESET) Install dependencies with Poetry\n"
 	@printf "$(GREEN)make install-req$(RESET) Create venv and install requirements.txt\n"
 	@printf "$(GREEN)make run$(RESET) Run the project\n"
 	@printf "$(GREEN)make debug$(RESET) Run the project with pdb\n"
+	@printf "$(GREEN)make test$(RESET) Run the test-suite with pytest\n"
 	@printf "$(GREEN)make lint$(RESET) Run flake8 and mypy\n"
 	@printf "$(GREEN)make lint-strict$(RESET) Run mypy with --strict\n"
 	@printf "$(GREEN)make clean$(RESET) Remove Python caches\n\n"
@@ -27,6 +33,7 @@ install:
 	@printf "$(BOLD)$(CYAN)→ Installing dependencies...$(RESET)\n"
 	@poetry install
 	@printf "$(GREEN)✓ Dependencies installed.$(RESET)\n"
+	@printf "  Activate the virtual environment with:\n  $(BOLD)$(YELLOW)source $$(poetry env activate)$(RESET)\n"
 
 install-req:
 	@printf "$(BOLD)$(CYAN)→ Creating virtual environment...$(RESET)\n"
@@ -35,7 +42,19 @@ install-req:
 	@source ./venv/bin/activate && pip install -r requirements.txt
 	@printf "$(GREEN)✓ Ready to run.$(RESET)\n"
 
-run: install
+run: 
+	@printf "$(BOLD)$(CYAN)→ Starting $(PROJECT)...$(RESET)\n\n"
+	@poetry run python3 $(NAME) $(ARGS) $(MAP)
+
+dev:
+	python3 $(NAME) maps/easy/01_linear_path.txt 2>log.txt
+
+debug: install
+	@printf "$(BOLD)$(YELLOW)→ Starting debugger...$(RESET)\n"
+	@python3 -m pdb $(NAME)
+
+test:
+	@printf "$(BOLD)$(BLUE)→ Running the test-suite...$(RESET)\n"
 	@if [ -z "$$VIRTUAL_ENV" ]; then \
 		printf "$(RED)✗ Error: not running inside a virtual environment.$(RESET)\n"; \
 		printf "$(YELLOW) Activate your venv first:\n  source venv/bin/activate\n  or source $$(poetry env activate)$(RESET)\n"; \
@@ -43,18 +62,12 @@ run: install
 	fi
 	@printf "$(GREEN)✓ Virtual environment detected: $$VIRTUAL_ENV$(RESET)\n"
 	@printf "$(BOLD)$(CYAN)→ Starting $(PROJECT)...$(RESET)\n\n"
-	@python3 main.py
-
-dev:
-	python3 main.py maps/easy/01_linear_path.txt 2>log.txt
-
-debug: install
-	@printf "$(BOLD)$(YELLOW)→ Starting debugger...$(RESET)\n"
-	@python3 -m pdb main.py
+	@python3 -m pytest
 
 clean:
 	@printf "$(BOLD)$(RED)→ Cleaning project...$(RESET)\n"
 	@find . -type d -name "pycache" -exec rm -rf {} +
+	@find . -type d -name "__pycache__" -exec rm -rf {} +
 	@find . -type d -name ".mypy_cache" -exec rm -rf {} +
 	@find . -type d -name ".pytest_cache" -exec rm -rf {} +
 	@find . -type f -name "*.pyc" -delete

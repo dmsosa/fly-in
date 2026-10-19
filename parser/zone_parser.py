@@ -25,7 +25,7 @@ class ZoneParser():
             coord = (int(tokens[1]), int(tokens[2]))
         except ValueError:
             raise ZoneParseError(
-                f"Zone {zone_data['name']} received invalid \
+                f"Zone {zone_name} received invalid \
                 coordinates: ({tokens[1]}, {tokens[2]})"
                 )
         

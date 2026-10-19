@@ -1,5 +1,6 @@
 # src/player/menu.py
 from pathlib import Path
+import sys
 from typing import List, Union
 from gui import FlyinPrinter, \
     move_cursor_up, \
@@ -54,28 +55,23 @@ class Menu:
         return self.items[self.selected_index]
 
     def run(self) -> Union[int, None]:
-        try:
-            key = read_menu_key()
-            if key is MenuKey.UP:
-                self.move_up()
-                return None
-            elif key is MenuKey.DOWN:
-                self.move_down()
-                return None
-            elif key is MenuKey.SELECT:
+        key = read_menu_key()
+        if key is MenuKey.UP:
+            self.move_up()
+            return None
+        elif key is MenuKey.DOWN:
+            self.move_down()
+            return None
+        elif key is MenuKey.SELECT:
+            return self.selected_index
+        elif key is MenuKey.EXIT:
+            return -1
+        else:
+            try:
+                self.get_item(key)
                 return self.selected_index
-            elif key is MenuKey.EXIT:
-                return -1
-            else:
-                selected_item = self.get_item(key)
-                index = 0
-                for i in self.items:
-                    if selected_item.key == i.key:
-                        return index
-                    index += 1
+            except KeyError:
                 return None
-        except KeyError as e:
-            print(f"Unknown key pressed for menu '{self.name}'\n{e}")
             
 
 #"""Run configuration chosen by the user through the menus."""
@@ -143,15 +139,16 @@ class FlyinMenu():
                 )
 
             idx = None
+            menu_height = len(self.active_menu.items)
             while idx is None:
-                menu_height = len(self.active_menu.items)
                 move_cursor_up(menu_height)
                 self.printer.print_menu(self.active_menu)
                 idx = self.active_menu.run()
 
             selected = paths[idx]
             if selected is None:
-                return None
+                print(f"Leaving the Fly-In program.")
+                sys.exit(0)
 
             if selected == "..":
                 current_dir = current_dir.parent

@@ -29,9 +29,9 @@ THEME_CHAR = {
 
 THEME_COLOR = {
     "bg":      "#000000",
-    "primary":    "#2121ff",
-    "secondary": "#ffff00",
-    "tertiary":   "#00ffff",
+    "primary":    "#3c7758",
+    "secondary": "#279119",
+    "tertiary":   "#B5A724",
     "danger":   "#ff0000",
     "bg-secondary":     "#242424",
     "warning": "#fdbe00",
@@ -65,18 +65,29 @@ BOLD_MAGENTA = "\033[95m"
 BOLD_CYAN = "\033[96m"
 BOLD_WHITE = "\033[97m"
 
-# Background colors
-BG_BLACK = "\033[40m"
-BG_RED = "\033[41m"
-BG_GREEN = "\033[42m"
-BG_YELLOW = "\033[43m"
-BG_BLUE = "\033[44m"
-BG_MAGENTA = "\033[45m"
-BG_CYAN = "\033[46m"
-BG_WHITE = "\033[47m"
+COLOR_MAP = {
+    "green": "\033[32m",
+    "red": "\033[31m",
+    "blue": "\033[34m",
+    "yellow": "\033[33m",
+    "magenta": "\033[35m",
+    "cyan": "\033[36m",
+    "gray": "\033[90m",
+    "orange": "\033[38;5;208m",
+    "purple": "\033[38;5;129m",
+    "gold": "\033[38;5;220m",
+    "brown": "\033[38;5;130m",
+    "maroon": "\033[38;5;88m",
+    "darkred": "\033[38;5;160m",
+    "crimson": "\033[38;2;220;20;60m",
+    "violet": "\033[38;5;177m",
+    "lime": "\033[38;5;118m",
+    "black": "\033[30m",
+}
 
 # Text styles
 BOLD = "\033[1m"
 ITALIC = "\033[3m"
+DIM = "\033[2m"
 UNDERLINE = "\033[4m"
 BLINK = "\033[5m"
