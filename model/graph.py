@@ -68,6 +68,8 @@ class Zone(BaseModel):
         return self.type == ZoneType.RESTRICTED
 
     def is_occupied(self) -> bool:
+        if self.max_drones is None:
+            return False
         return self.drone_count >= self.max_drones
 
     def get_dynamic_cost(self) -> float:
@@ -84,7 +86,8 @@ class Zone(BaseModel):
             ZoneType.RESTRICTED: 2.0,
             ZoneType.BLOCKED: math.inf,
         }[self.type]
-        occupancy = self.drone_count / max(self.max_drones, 1)
+        capacity = self.max_drones if self.max_drones is not None else 1
+        occupancy = self.drone_count / max(capacity, 1)
         return type_weight * (1 + occupancy)
 
     def get_cost(self) -> float:
@@ -94,7 +97,7 @@ class Zone(BaseModel):
         """Check whether the zone has unbounded drone capacity.
 
         Returns:
-            bool: True if capacity equals or exceeds sys.maxsize.
+            bool: True when ``max_drones`` is ``None`` (start/end hubs).
         """
         return self.max_drones is None
 

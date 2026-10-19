@@ -1,6 +1,6 @@
 from typing import cast
 
-from model.graph import Zone, Connection
+from model.graph import FlyinGraph, Zone, Connection
 
 
 class ReservationTable:
@@ -15,15 +15,21 @@ class ReservationTable:
     * ``connection.drone_count`` counts drones currently crossing a
       restricted link (they hold the link for the two turns of the
       crossing);
-    * ``link_occupancy`` counts *instantaneous* hops made during a single
-      turn, because a normal move finishes in the same turn and would
-      otherwise leave no trace behind.
+    * ``_link_hops`` counts *instantaneous* normal hops made during a
+      single turn, because a normal move finishes in the same turn and
+      would otherwise leave no trace behind.
+
+    ``zone_occupancy`` and ``link_occupancy`` are per-turn *snapshots*
+    produced by :meth:`record_turn`. They are what the terminal GUI reads
+    to display usage; recomputing them from the live counters keeps them
+    accurate even for drones that simply stay in a zone.
     """
 
     def __init__(self) -> None:
         """Initialize the per-turn occupancy ledgers."""
         self.zone_occupancy: dict[tuple[str, int], int] = {}
         self.link_occupancy: dict[tuple[tuple[str, str], int], int] = {}
+        self._link_hops: dict[tuple[tuple[str, str], int], int] = {}
 
     def is_zone_available(
         self,
@@ -50,7 +56,7 @@ class ReservationTable:
             conn: Traversed connection.
             turn: Traversal turn.
         """
-        used = conn.drone_count + self.link_occupancy.get((conn.key, turn), 0)
+        used = conn.drone_count + self._link_hops.get((conn.key, turn), 0)
         return used < conn.max_link_capacity
 
     def reserve_zone(self, zone: Zone, turn: int) -> None:
@@ -70,10 +76,28 @@ class ReservationTable:
     def reserve_link(self, conn: Connection, turn: int) -> None:
         """Register one instantaneous hop on ``conn`` at ``turn``."""
         key = (conn.key, turn)
-        self.link_occupancy[key] = self.link_occupancy.get(key, 0) + 1
+        self._link_hops[key] = self._link_hops.get(key, 0) + 1
 
     def release_link(self, conn: Connection, turn: int) -> None:
         """Undo a single instantaneous hop on ``conn`` at ``turn``."""
         key = (conn.key, turn)
-        if self.link_occupancy.get(key, 0) > 0:
-            self.link_occupancy[key] -= 1
+        if self._link_hops.get(key, 0) > 0:
+            self._link_hops[key] -= 1
+
+    def record_turn(self, graph: FlyinGraph, turn: int) -> None:
+        """Snapshot the live occupancy of ``turn`` for the GUI / reporting.
+
+        Zone usage is the number of drones sitting in each zone, and link
+        usage is the normal hops of the turn plus the drones still crossing
+        a restricted link. Both are recomputed from the live counters, so
+        calling this again for the same turn is idempotent.
+
+        Args:
+            graph: Graph the simulation is running on.
+            turn: Turn that was just simulated.
+        """
+        for zone in graph.all_zones:
+            self.zone_occupancy[(zone.name, turn)] = zone.drone_count
+        for conn in graph.connections:
+            hops = self._link_hops.get((conn.key, turn), 0)
+            self.link_occupancy[(conn.key, turn)] = hops + conn.drone_count

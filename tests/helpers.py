@@ -104,8 +104,6 @@ def make_drone(
         raise AssertionError(f"unknown zone in test graph: {zone_name}")
     drone = Drone(
         id=drone_id,
-        start_zone=graph.start_zone,
-        end_zone=graph.end_zone,
         current_zone=zone,
     )
     if occupy:

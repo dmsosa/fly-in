@@ -25,10 +25,10 @@ def _assert_capacities_hold(orch: Orchestrator) -> None:
 
     turn = orch.turn_count
     for conn in orch.graph.connections:
-        used = (
-            conn.drone_count
-            + orch.reservation_table.link_occupancy.get((conn.key, turn), 0)
-        )
+        # ``record_turn`` already folds the persistent in-flight count and
+        # the instantaneous hops into a single snapshot, so read it alone
+        # instead of adding ``drone_count`` on top of it.
+        used = orch.reservation_table.link_occupancy.get((conn.key, turn), 0)
         assert used <= conn.max_link_capacity, conn.key
 
 
@@ -111,6 +111,99 @@ def test_choose_next_honours_zone_capacity() -> None:
     chosen, _ = orch._choose_next(orch.drones["D1"], graph.start_zone, 0)
     assert chosen is not None
     assert chosen.name == "b"
+
+
+def test_choose_next_rejects_equal_distance_branches() -> None:
+    """A branch that does not lower the cost-to-go must not be taken.
+
+    ``a`` is an available neighbour of ``start`` but has the same
+    cost-to-go, so the drone waits for ``loop`` (strictly closer) instead
+    of drifting sideways. Strict progress is what makes ping-pong
+    impossible without hard-banning visited zones.
+    """
+    graph = make_graph(
+        drone_count=1,
+        start=("start", (0, 0)),
+        end=("goal", (3, 0)),
+        zones=[
+            {"name": "a", "coord": (1, 0)},
+            {"name": "b", "coord": (2, 0)},
+            {"name": "loop", "coord": (1, 1)},
+        ],
+        connections=[
+            ("start", "a"),
+            ("a", "b"),
+            ("b", "goal"),
+            ("start", "loop"),
+            ("loop", "goal"),
+        ],
+    )
+    orch = make_orchestrator(graph)
+    distance_map = orch.pathfinding.distance_map
+    assert distance_map["a"] == distance_map["start"]
+
+    # ``loop`` is full, so the only *available* neighbour is the sideways
+    # branch ``a``. The drone must wait rather than take it.
+    graph.get_zone_by_name("loop").drone_count = 1
+    chosen, _ = orch._choose_next(orch.drones["D1"], graph.start_zone, 0)
+    assert chosen is None
+
+
+# ---- link accounting ----------------------------------------------------
+
+
+def test_restricted_link_crossing_is_counted_once() -> None:
+    """A two-turn crossing must not be double-counted.
+
+    The crossing is tracked by ``connection.drone_count``; adding it to the
+    per-turn hop ledger as well used to make a single drone read as
+    ``2/1`` on a capacity-1 link.
+    """
+    graph = make_graph(
+        drone_count=2,
+        start=("start", (0, 0)),
+        end=("goal", (2, 0)),
+        zones=[{"name": "r", "coord": (1, 0), "type": "restricted"}],
+        connections=[
+            {"zone_a": "start", "zone_b": "r", "max_link_capacity": 1},
+            {"zone_a": "r", "zone_b": "goal", "max_link_capacity": 1},
+        ],
+        start_max_drones=2,
+        end_max_drones=2,
+    )
+    orch = make_orchestrator(graph)
+    conn = graph.get_connection("start", "r")
+
+    moves = orch.next_turn()
+    assert [m.to_str() for m in moves] == ["D1-start-r"]
+    assert conn.drone_count == 1
+    assert orch.reservation_table.link_occupancy[(conn.key, 0)] == 1
+    _assert_capacities_hold(orch)
+
+
+# ---- GUI / reporting snapshots ------------------------------------------
+
+
+def test_record_turn_shows_occupancy_on_every_turn() -> None:
+    """A drone that stays in a zone keeps showing up in the usage ledger."""
+    graph = make_graph(
+        drone_count=1,
+        start=("start", (0, 0)),
+        end=("goal", (2, 0)),
+        zones=[{"name": "a", "coord": (1, 0)}],
+        connections=[("start", "a"), ("a", "goal")],
+    )
+    orch = make_orchestrator(graph)
+    table = orch.reservation_table
+
+    orch.next_turn()  # D1 lands on "a"
+    assert orch.turn_count == 0
+    assert table.zone_occupancy[("a", 0)] == 1
+
+    orch.turn_count += 1
+    orch.next_turn()  # D1 leaves "a" for "goal"
+    assert table.zone_occupancy[("a", 1)] == 0
+    assert table.zone_occupancy[("goal", 1)] == 1
 
 
 # ---- deadlocks ----------------------------------------------------------

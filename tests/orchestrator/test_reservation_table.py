@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from model.graph import Connection, Zone
 from orchestrator.reservation_table import ReservationTable
+from tests.helpers import make_graph
 
 
 def make_zone(name: str = "a", **kwargs) -> Zone:
@@ -108,3 +109,56 @@ class TestLinkReservations:
         assert not table.is_link_available(conn, 0)
         table.release_link(conn, 0)
         assert table.is_link_available(conn, 0)
+
+    def test_hops_no_longer_leak_into_the_link_snapshot(self) -> None:
+        """The availability counter and the GUI snapshot stay separate."""
+        table = ReservationTable()
+        conn = Connection(zone_a="a", zone_b="b", max_link_capacity=1)
+        table.reserve_link(conn, 0)
+        assert not table.is_link_available(conn, 0)
+        # No snapshot taken yet, so nothing is reported for the GUI.
+        assert table.link_occupancy.get((conn.key, 0), 0) == 0
+
+
+class TestTurnSnapshots:
+    def _graph(self):
+        return make_graph(
+            drone_count=1,
+            start=("start", (0, 0)),
+            end=("goal", (2, 0)),
+            zones=[{"name": "a", "coord": (1, 0)}],
+            connections=[("start", "a"), ("a", "goal")],
+        )
+
+    def test_reports_live_zone_occupancy(self) -> None:
+        graph = self._graph()
+        table = ReservationTable()
+        graph.get_zone_by_name("a").drone_count = 1
+
+        table.record_turn(graph, 3)
+
+        assert table.zone_occupancy[("a", 3)] == 1
+        assert table.zone_occupancy[("start", 3)] == 0
+
+    def test_combines_hops_and_in_flight_crossings(self) -> None:
+        graph = self._graph()
+        table = ReservationTable()
+        conn = graph.get_connection("start", "a")
+        table.reserve_link(conn, 0)
+        conn.drone_count = 1  # a second drone is crossing the same link
+
+        table.record_turn(graph, 0)
+
+        assert table.link_occupancy[(conn.key, 0)] == 2
+
+    def test_is_idempotent(self) -> None:
+        graph = self._graph()
+        table = ReservationTable()
+        conn = graph.get_connection("start", "a")
+        table.reserve_link(conn, 0)
+        conn.drone_count = 1
+
+        table.record_turn(graph, 0)
+        table.record_turn(graph, 0)
+
+        assert table.link_occupancy[(conn.key, 0)] == 2

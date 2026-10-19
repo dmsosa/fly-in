@@ -4,6 +4,7 @@ import traceback
 from pydantic import ValidationError
 
 from error.error import FlyinParseError
+from gui.constants import DELAY, DIRECT, FAST_DELAY
 from gui.gui import FlyinGui
 from gui.terminal_gui import TerminalGui
 from gui.utils import exit_program, wait_for_enter
@@ -99,17 +100,43 @@ def main() -> None:
 
             gui = FlyinGui(graph=graph)
 
-            if not gui.confirm_map_file(graph.filename, menu):
-                break
+            try:
+                if menu.run_confirm_file_map(graph.filename, menu):
+                    break
+            except KeyboardInterrupt:
+                history = orchestrator.run_orchestra()
+                orchestrator.export_turns()
 
-            pathfinding = DijkstraPathfinding(graph)
-            orchestrator = Orchestrator(graph=graph, pathfinding=pathfinding)
-            history = orchestrator.run_orchestra()
-            orchestrator.export_turns()
+        pathfinding = DijkstraPathfinding(graph)
+        orchestrator = Orchestrator(graph=graph, pathfinding=pathfinding)
 
-            terminal_gui = TerminalGui(graph, orchestrator.reservation_table, history)
-            terminal_gui.print_history()
-            input()
+        manual = False
+        direct = False
+        config = menu.run_configure_ui_menu(gui)
+        delay = DELAY
+        if config == 0:
+            manual = True
+        elif config == 1:
+            direct = True
+            delay = DIRECT
+        elif config == 2:
+            delay = DELAY
+        elif config == 3:
+            delay = FAST_DELAY
+        else:
+            direct = True
+            delay = DIRECT
+
+        terminal_gui = TerminalGui(
+            graph,
+            orchestrator.reservation_table,
+            history,
+            manual,
+            direct,
+            delay
+            )
+        terminal_gui.print_history()
+        
             
 
 
@@ -117,6 +144,7 @@ def main() -> None:
         # Know if the user wants to do it, handled by try_again Menu
         # 
 
+        wait_for_enter("\n Simulation finished, click enter...")
         try_again = input("try aain")
         if try_again == "si":
             continue

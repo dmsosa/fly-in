@@ -5,6 +5,8 @@ from typing import List, Union
 from gui import FlyinPrinter, \
     move_cursor_up, \
     clear_screen
+from gui.constants import MENU_WIDTH
+from gui.utils import exit_program
 from .keys import MenuKey, read_menu_key
 
 
@@ -163,7 +165,20 @@ class FlyinMenu():
                 self.set_path_to_config(str(path))
                 break 
 
-    def run_confirm_file_map(self) -> None:
+    def run_confirm_file_map(self, map_name: str) -> None:
+        """Prompts the user to review and confirm the loaded map.
+
+        Args:
+            gui (Gui): Interface containing the rendered map.
+            map_name (str): Chosen map identifier.
+
+        Returns:
+            bool: True if confirmed, False to return to map selection.
+        """
+        print("\n" + "═" * MENU_WIDTH)
+        print(f"Do you want to continue with {map_name}\n?")
+        print("═" * MENU_WIDTH, end="\n\n")
+
         self.items = [
             "Continue with simulation",
             "Choose another file",
@@ -173,6 +188,32 @@ class FlyinMenu():
             "Select an option:",
             self.items
             )
+
+        idx = None
+        while idx is None:
+            menu_height = len(self.items)
+            move_cursor_up(menu_height)
+            self.printer.print_menu(self.active_menu)
+            idx = self.active_menu.run()
+    
+        if idx == 0:
+            return True
+        if idx == 1:
+            return False
+        else:
+            exit_program()
+
+        return False
+
+
+    def run_configure_ui_menu(self) -> None:
+        self.items = [
+            "Manual",
+            "Direct",
+            "Step-by-step",
+            "Fast"
+        ]
+        self.active_menu = Menu(" Configure the terminal behaviour ", self.items)
 
         idx = None
         while idx is None:

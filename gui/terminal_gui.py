@@ -1,4 +1,7 @@
+from time import sleep
+
 from gui.constants import BOLD, DIM, COLOR_MAP, MENU_WIDTH, RESET
+from gui.utils import clear_screen, wait_for_enter
 from model.graph import FlyinGraph
 from orchestrator.orchestrator import Move
 from orchestrator.reservation_table import ReservationTable
@@ -93,6 +96,9 @@ class TerminalGui:
         return self.colorize(move.to_str(), color, bold=True)
 
     def print_history(self) -> None:
+        if self.direct:
+            clear_screen()
+
         for turn in self.history:
             turn_id = turn[0].turn_id
             line = []
@@ -107,6 +113,10 @@ class TerminalGui:
             if self.display_usage:
                 self._display_zone_usage(turn_id)
                 self._display_conn_usage(turn_id)
+            if self.manual:
+                wait_for_enter()
+            if not self.direct and not self.manual:
+                sleep(self.delay)
 
     def _display_zone_usage(self, turn_id: int) -> None:
         zone_usage_title = f" Zone usage {turn_id + 1} ".center(MENU_WIDTH, "*")

@@ -83,6 +83,16 @@ class TestZoneCosts:
         zone.drone_count = 1
         assert zone.get_dynamic_cost() > empty_cost
 
+    def test_unlimited_zone_is_never_occupied(self) -> None:
+        zone = Zone(name="hub", coord=(0, 0), max_drones=None)
+        assert zone.is_unlimited_capacity() is True
+        zone.drone_count = 10_000
+        assert zone.is_occupied() is False
+
+    def test_unlimited_zone_dynamic_cost_does_not_crash(self) -> None:
+        zone = Zone(name="hub", coord=(0, 0), max_drones=None)
+        assert zone.get_dynamic_cost() > 0
+
 
 class TestZoneIdentity:
     def test_equality_and_hash_are_by_name(self) -> None:

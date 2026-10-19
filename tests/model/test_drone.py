@@ -32,10 +32,10 @@ class TestDroneDefaults:
 
 
 class TestVisitedMemory:
-    def test_remember_appends_to_the_window(self) -> None:
+    def test_add_last_visited_appends_to_the_window(self) -> None:
         drone = Drone(id="D1")
-        drone.remember("a")
-        drone.remember("b")
+        drone.add_last_visited("a")
+        drone.add_last_visited("b")
 
         assert list(drone.last_visited) == ["a", "b"]
         assert drone.has_visited("a") is True
@@ -44,17 +44,17 @@ class TestVisitedMemory:
     def test_memory_is_bounded(self) -> None:
         drone = Drone(id="D1")
         for name in ["a", "b", "c", "d"]:
-            drone.remember(name)
+            drone.add_last_visited(name)
 
         assert len(drone.last_visited) == VISITED_MEMORY
         assert list(drone.last_visited) == ["b", "c", "d"]
 
     def test_old_zones_leave_the_window(self) -> None:
         drone = Drone(id="D1")
-        drone.remember("a")
-        drone.remember("b")
-        drone.remember("c")
-        drone.remember("d")
+        drone.add_last_visited("a")
+        drone.add_last_visited("b")
+        drone.add_last_visited("c")
+        drone.add_last_visited("d")
         # ``a`` has been pushed out of the memory window.
         assert drone.has_visited("a") is False
         assert drone.has_visited("d") is True
@@ -62,6 +62,6 @@ class TestVisitedMemory:
     def test_memory_is_not_shared_between_drones(self) -> None:
         first = Drone(id="D1")
         second = Drone(id="D2")
-        first.remember("x")
+        first.add_last_visited("x")
         assert list(first.last_visited) == ["x"]
         assert list(second.last_visited) == []

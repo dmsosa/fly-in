@@ -166,26 +166,32 @@ class Orchestrator:
                 drone.state = DroneState.WAIT
                 continue
 
-            # Independently of restricted or normal zone, the drone
-            # occupies the connection and releases the current zone
-            # in both cases
-            self.reservation_table.reserve_link(connection, turn)
+            # The drone always gives its slot back to the zone it leaves.
             self.reservation_table.release_zone(current, turn)
 
             if chosen.is_restricted():
-                # Leave the current zone and start the two-turn crossing.
+                # A restricted crossing holds the link for two turns, so it
+                # is tracked by ``connection.drone_count`` and must NOT also
+                # be added to the per-turn hop ledger (that would count the
+                # same drone twice and block the link).
                 drone.current_zone = None
                 drone.target = chosen
                 drone.connection = connection
+                drone.wait_count = 0
                 connection.drone_count += 1
                 drone.state = DroneState.FLYIN
                 target_name = f"{current.name}-{chosen.name}"
             else:
+                # A normal hop is instantaneous, so it only lives in the
+                # per-turn ledger.
+                self.reservation_table.reserve_link(connection, turn)
                 self._land(drone, chosen, turn)
-                target_name = f"{chosen.name}"
+                target_name = chosen.name
 
             moves.append(Move(turn, drone.id, target_name))
 
+        # Snapshot the live usage of this turn for the GUI / reporting.
+        self.reservation_table.record_turn(self.graph, turn)
         return moves
 
     def _choose_next(
@@ -203,20 +209,23 @@ class Orchestrator:
         """
         distance_map = self.pathfinding.distance_map
         current_distance = distance_map.get(current.name, float("inf"))
-        chosen = None
-        chosen_conn = None
+
+        # Every accepted candidate must lower the cost-to-go *strictly*.
+        # Equal-distance moves are rejected on purpose: waiting for the
+        # cheapest option to free up is always better than drifting onto a
+        # branch that does not bring the drone any closer.
+        best_distance = float("inf")
+        candidates: list[tuple[Zone, Connection]] = []
         for candidate in self.pathfinding.find_best_zones(current):
             if candidate.name == current.name:
-                continue
-            if drone.has_visited(candidate.name):
                 continue
             candidate_distance = distance_map.get(
                 candidate.name, float("inf")
             )
-            if candidate_distance > current_distance:
+            if not candidate_distance < current_distance:
                 continue
             if not self.reservation_table.is_zone_available(
-                candidate, turn, candidate.name == self.graph.end_zone.name
+                candidate, turn, candidate.hub_type == HubType.END
             ):
                 continue
             connection = self.graph.get_connection(
@@ -224,11 +233,23 @@ class Orchestrator:
             )
             if not self.reservation_table.is_link_available(connection, turn):
                 continue
-            chosen = candidate
-            chosen_conn = connection
-            break
 
-        return chosen, chosen_conn
+            if candidate_distance < best_distance:
+                best_distance = candidate_distance
+                candidates = [(candidate, connection)]
+            elif candidate_distance == best_distance:
+                candidates.append((candidate, connection))
+
+        if not candidates:
+            return None, None
+
+        # ``last_visited`` is a *preference* among the equally-good
+        # candidates, never a hard ban, so the drone is never stranded just
+        # because it already knows every option.
+        for candidate, connection in candidates:
+            if not drone.has_visited(candidate.name):
+                return candidate, connection
+        return candidates[0]
 
     def _land(self, drone: Drone, zone: Zone, turn: int) -> None:
         """Move ``drone`` into ``zone`` and update all bookkeeping."""

@@ -49,38 +49,6 @@ class FlyinGui:
         self.col, self.row = 15, 15
         pass
 
-    
-    def confirm_map_file(self, map_name: str, menu: "FlyinMenu") -> bool:
-        """Prompts the user to review and confirm the loaded map.
-
-        Args:
-            gui (Gui): Interface containing the rendered map.
-            map_name (str): Chosen map identifier.
-
-        Returns:
-            bool: True if confirmed, False to return to map selection.
-        """
-        print("Do you want to continue?")
-        col = self.col if self.col < UX_MAX else UX_STD
-        print("\n" + "═" * col)
-        print("pLEASE CONFIRM THE MAP")
-        print("═" * col, end="\n\n")
-        print(f"Using following: {map_name}\n")
-
-        if self.col < UX_MAX:
-            print("grid")
-        else:
-            print("size warning")
-        idx = menu.run_confirm_file_map()
-
-        if idx == 0:
-            return True
-        if idx == 1:
-            return False
-        else:
-            exit_program()
-
-        return False
 
     def print_history(self) -> None:
         lines = []
