@@ -85,4 +85,4 @@ def read_boolean_key() -> bool:
         if key is MenuKey.EXIT:
             break
         move_cursor_up(3)
-    print(f"Cancelled the select boolean operation")
+    print("Cancelled the select boolean operation")

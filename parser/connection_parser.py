@@ -22,7 +22,7 @@ class ConnectionParser():
             raise ConnectionParseError(f"Invalid metadata line for connection '{data_str}'.")
         zone_names = tokens[0].split("-")
         if len(zone_names) != 2:
-            raise ConnectionParseError(f"Invalid metadata zone names for connection '{zone_names}'.")
+            raise ConnectionParseError(f"Invalid connection syntax {zone_names}. Must be 'zoneA-zoneB'")
         
         conn_data = {
             "zone_a": zone_names[0],
@@ -34,7 +34,7 @@ class ConnectionParser():
             for metadata in tokens[1:]:
                 parts = metadata.split("=")
                 if len(parts) != 2:
-                    raise ConnectionParseError(f"Invalid metadata token '{metadata}'.")
+                    raise ConnectionParseError(f"Invalid metadata syntax '{metadata}' must be key=value.")
                 meta_key, meta_value = parts
                 meta_key = meta_key.strip("[]")
                 meta_value = meta_value.strip("[]")

@@ -34,7 +34,17 @@ class Menu:
         self.name = name
         self.items = []
         for idx, item in enumerate(items):
-            self.items.append(MenuItem(str(idx), item, { item[0], item[0].upper, str(idx) }))
+            self.items.append(
+                MenuItem(
+                    key=str(idx),
+                    label=item,
+                    keys={
+                        item[0],
+                        item[0].upper,
+                        str(idx)
+                    }
+                )
+            )
         self.selected_index: int = 0
         self.items_len: int = len(items)
 
@@ -74,9 +84,9 @@ class Menu:
                 return self.selected_index
             except KeyError:
                 return None
-            
 
-#"""Run configuration chosen by the user through the menus."""
+
+# Run configuration chosen by the user through the menus.
 class FlyinMenu():
     """
     Holds metadata about the current Flyin Program
@@ -85,8 +95,10 @@ class FlyinMenu():
     the interactive menu is just a while loop that returns
     an index.
 
-    After pressing enter on the LevelMenu, it changes the MenuState to FILE_NAME
-    after pressing enter on FILE_NAME, it changes to MenuState.RUN
+    After pressing enter on the LevelMenu,
+    it changes the MenuState to FILE_NAME
+    after pressing enter on FILE_NAME,
+    it changes to MenuState.RUN
     """
     def __init__(self, printer: FlyinPrinter) -> None:
         """Start with nothing selected."""
@@ -102,11 +114,10 @@ class FlyinMenu():
         while True:
             clear_screen()
 
-            print(f"\nSelect the map file to be open\n")
+            print("\nSelect the map file to be open\n")
             current_rel = current_dir.relative_to(MAPS_ROOT)
             print(f" 📁 Path: {current_rel}\n")
 
-        
             self.items = []
             paths: list[str] = []
 
@@ -116,7 +127,9 @@ class FlyinMenu():
             try:
                 entries = sorted(current_dir.iterdir())
                 for entry in entries:
-                    if entry.name.startswith((".", "_", "venv", "requirements")):
+                    if entry.name.startswith(
+                            (".", "_", "venv", "requirements")
+                            ):
                         continue
                     if entry.is_dir():
                         self.items.append(f"📁 {entry.name}/")
@@ -131,7 +144,7 @@ class FlyinMenu():
             if len(self.items) == 0:
                 print("❌ No folders or .txt files found")
                 continue
-    
+
             self.items.append("❌  Exit")
             paths.append(None)
 
@@ -141,7 +154,7 @@ class FlyinMenu():
                 )
 
             idx = None
-            menu_height = len(self.active_menu.items)
+            menu_height = len(self.active_menu.items) + 1
             while idx is None:
                 move_cursor_up(menu_height)
                 self.printer.print_menu(self.active_menu)
@@ -149,7 +162,7 @@ class FlyinMenu():
 
             selected = paths[idx]
             if selected is None:
-                print(f"Leaving the Fly-In program.")
+                print("Leaving the Fly-In program.")
                 sys.exit(0)
 
             if selected == "..":
@@ -160,12 +173,12 @@ class FlyinMenu():
             if path.is_dir():
                 current_dir = path
                 continue
-            
+
             if path.is_file() and path.suffix == ".txt":
                 self.set_path_to_config(str(path))
-                break 
+                break
 
-    def run_confirm_file_map(self, map_name: str) -> None:
+    def run_confirm_file_map(self, map_name: str) -> bool:
         """Prompts the user to review and confirm the loaded map.
 
         Args:
@@ -191,11 +204,11 @@ class FlyinMenu():
 
         idx = None
         while idx is None:
-            menu_height = len(self.items)
+            menu_height = len(self.items) + 1
             move_cursor_up(menu_height)
             self.printer.print_menu(self.active_menu)
             idx = self.active_menu.run()
-    
+
         if idx == 0:
             return True
         if idx == 1:
@@ -205,19 +218,35 @@ class FlyinMenu():
 
         return False
 
-
-    def run_configure_ui_menu(self) -> None:
+    def run_configure_ui_menu(self) -> int:
         self.items = [
             "Manual",
             "Direct",
             "Step-by-step",
             "Fast"
         ]
-        self.active_menu = Menu(" Configure the terminal behaviour ", self.items)
+        title = " Configure the terminal behaviour "
+        self.active_menu = Menu(title, self.items)
 
         idx = None
         while idx is None:
-            menu_height = len(self.items)
+            menu_height = len(self.items) + 1
+            move_cursor_up(menu_height)
+            self.printer.print_menu(self.active_menu)
+            idx = self.active_menu.run()
+
+        return idx
+
+    def run_continue_menu(self, title: str) -> int:
+        self.items = [
+            "Yes",
+            "No"
+        ]
+        self.active_menu = Menu(f"{ title }", self.items)
+
+        idx = None
+        while idx is None:
+            menu_height = len(self.items) + 1
             move_cursor_up(menu_height)
             self.printer.print_menu(self.active_menu)
             idx = self.active_menu.run()

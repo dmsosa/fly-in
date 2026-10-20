@@ -2,7 +2,7 @@ import math
 from pathlib import Path
 from typing import Any
 from .connection_parser import ConnectionParser
-from .zone_parser import ZoneParser
+from .zone_parser import ZoneParseError, ZoneParser
 from error import FlyinParseError
 
 
@@ -77,7 +77,7 @@ class FlyinParser:
             data = data.strip()
 
             if not first_line_nb_drones and key != "nb_drones":
-                raise FlyinParseError(f"The first line must define the number of drones using nb_drones: <number>. [Line: {row + 1}]")
+                raise FlyinParseError(f"The first line must define the number of drones using nb_drones: <number>.")
             
             if not self._valid_key(key):
                 raise FlyinParseError(f"Key for parser not recognized: '{key}'. [Line: {row + 1}]")

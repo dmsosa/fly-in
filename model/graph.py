@@ -2,7 +2,10 @@ from enum import Enum
 import math
 import re
 from typing import Any, Optional
-from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
+from pydantic import BaseModel, \
+                Field, \
+                field_validator, \
+                model_validator
 from pydantic_core import PydanticCustomError
 from .constants import Coord
 
@@ -48,18 +51,20 @@ class Zone(BaseModel):
     @classmethod
     def name_no_dashes_or_spaces(cls, value: str) -> str:
         if not re.match(r"^[^- ]*$", value):
-            raise ValueError(f"Zone name must not contain dashes or spaces: '{value}'")
+            raise ValueError(
+                f"Zone name must not contain dashes or spaces: '{value}'"
+                )
         return value
 
     def model_post_init(self, context) -> None:
         if self.type == ZoneType.NORMAL:
-            self.static_cost =  1
+            self.static_cost = 1
         elif self.type == ZoneType.PRIORITY:
-            self.static_cost =  0.5
+            self.static_cost = 0.5
         elif self.type == ZoneType.RESTRICTED:
-            self.static_cost =  2
+            self.static_cost = 2
         elif self.type == ZoneType.BLOCKED:
-            self.static_cost =  math.inf
+            self.static_cost = math.inf
 
     def is_blocked(self) -> bool:
         return self.type == ZoneType.BLOCKED
@@ -147,7 +152,7 @@ class FlyinGraph(BaseModel):
     connections # all connections in a set
     """
     filename: str
-    drone_count: int = Field(ge=1)
+    drone_count: int = Field(gt=0, lt=101)
     start_zone: Zone
     end_zone: Zone
     zones: list[Zone] = Field(default_factory=list)
@@ -178,16 +183,43 @@ class FlyinGraph(BaseModel):
 
         unique_names = {z.name for z in self.all_zones}
         if  all_zones_count != len(unique_names):
+            all_zones_len = len(self.all_zones)
+            found = False
+            for i in range(0, all_zones_len):
+                zone_i = self.all_zones[i]
+                first_dup = zone_i.name
+                for j in range(i + 1, all_zones_len):
+                    zone_j = self.all_zones[j]
+                    second_dup = zone_j.name
+                    if first_dup == second_dup:
+                        found = True
+                        break
+                if found:
+                    break
+
             raise PydanticCustomError(
                 "duplicate_hub_names",
-                "Duplicated zone names, review your config file"
+                f"Duplicated zone names {first_dup} - {second_dup}"
             )
 
         unique_coords = {z.coord for z in self.all_zones}
         if all_zones_count != len(unique_coords):
+            all_zones_len = len(self.all_zones)
+            found = False
+            for i in range(0, all_zones_len):
+                zone_i = self.all_zones[i]
+                first_dup = zone_i.coord
+                for j in range(i + 1, all_zones_len):
+                    zone_j = self.all_zones[j]
+                    second_dup = zone_j.coord
+                    if first_dup == second_dup:
+                        found = True
+                        break
+                if found:
+                    break
             raise PydanticCustomError(
                 "duplicate_zone_coords",
-                "Duplicated zone coordinates, review your config file"
+                f"Duplicated zone coordinates {first_dup} - {second_dup}"
             )
 
         unique_connections = set()
@@ -198,7 +230,7 @@ class FlyinGraph(BaseModel):
             if current_conn in unique_connections:
                 raise PydanticCustomError(
                     "duplicate_connection",
-                    f"Duplicated connection, review your config file ({zone_a}, {zone_b})",
+                    f"Duplicated zone connection {zone_a} - {zone_b}"
                 )
             unique_connections.add(current_conn)
 

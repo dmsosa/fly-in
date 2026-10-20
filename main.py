@@ -1,47 +1,56 @@
+import argparse
 import sys
 import traceback
-
 from pydantic import ValidationError
-
-from error.error import FlyinParseError
-from gui.constants import DELAY, DIRECT, FAST_DELAY
-from gui.gui import FlyinGui
-from gui.terminal_gui import TerminalGui
-from gui.utils import exit_program, wait_for_enter
+from error.error import FlyinError, FlyinParseError, FlyinUnreachableError
+from gui import DELAY, \
+        DIRECT, \
+        FAST_DELAY, \
+        TerminalGui, \
+        exit_program, \
+        should_use_ansi, \
+        wait_for_enter, \
+        FlyinPrinter
 from menu import FlyinMenu
-from gui import FlyinPrinter
-from gui.terminal_utils import clear_screen, should_use_ansi, supports_ansi
 from model.graph import FlyinGraph
 from orchestrator.orchestrator import Orchestrator
 from parser import FlyinParser
 from pathfinding.dijkstra import DijkstraPathfinding
 
 
-def parse_and_init_graph(config_file: str, parser: FlyinParser) -> None:
+__author__ = "Durian Sosa"
+__email__ = "durisosa@student.42madrid.com"
+
+
+def parse_and_init_graph(
+    config_file: str, parser: FlyinParser
+) -> tuple[str, FlyinGraph] | None:
     try:
         parser = FlyinParser()
         graph_data = parser.parse(config_file)
     except PermissionError as e:
         print(f"❌ Permission denied to file: \n{e}")
+        print("   Closing the program.")
+        return None
     except FileNotFoundError as e:
         print(f"❌ No folders or .txt files found: \n{e}")
+        print("    Closing the program.")
+        return None
     except IOError as e:
         print(f"IO Error: \n{e}")
+        return None
     except FlyinParseError as e:
         print("Exception while parsing.")
         print(f"   └── {e}\n")
-        sys.exit(1)
+        return None
     except Exception as e:
         print("An unexpected error occurred.")
         print(f"   └── {e}\n")
-        traceback.print_exc(file=sys.stderr)
-        sys.exit(1)
+        return None
 
-    graph = None
     try:
         graph = FlyinGraph(**graph_data)
     except ValidationError as e:
-        clear_screen()
         print("Exception while creating graph class.")
         for error in e.errors():
             field_loc = " -> ".join(str(loc) for loc in error["loc"])
@@ -49,71 +58,99 @@ def parse_and_init_graph(config_file: str, parser: FlyinParser) -> None:
                 field_loc if field_loc else "Configuration File"
             )
             print(f"   └── [{display_loc}] {error['msg']}\n")
-        wait_for_enter(None)
+        return None
 
     except Exception as e:
         print("An unexpected error occurred.")
         print(f"   └── {e}\n")
         traceback.print_exc(file=sys.stderr)
-        wait_for_enter(None)
-        exit_program()
+        return None
 
-    return graph
+    return graph_data["filename"], graph
 
 
 def main() -> None:
     # First, let the user choose the configuration file to open
-    # As I want to do this various times, is enough to wrap it inside a while loop
-    config_file_arg = None
+    # As I want to do this various times, wrapping it in a while loop
+    # is enough.
+    arg_parser = argparse.ArgumentParser(
+         description="Fly-in drone fleet routing simulator."
+    )
+    arg_parser.add_argument(
+        "map",
+        nargs='?',
+        default=None,
+        help="Path to the map text file"
+    )
+    arg_parser.add_argument(
+        "-m",
+        "--map",
+        dest="map_flag",
+        default=None,
+        help="Path to the map text file"
+    )
+    arg_parser.add_argument(
+        "-c",
+        "--color",
+        default=True,
+        action="store_true",
+        help="Enable colored visual terminal display and metrics",
+    )
+    # Verbose Debug Add-On
+    arg_parser.add_argument(
+        "-v",
+        "--verbose",
+        default=False,
+        action="store_true",
+        help="Enable debug informations",
+    )
 
-    argv_len = len(sys.argv)
-    if argv_len == 2:
-        config_file_arg = sys.argv[1]
-    elif argv_len > 2:
-        print(
-            "CRITICAL ERROR: \
-            Usage of the program is flyin.py [config_file]"
-            )
-        sys.exit(1)
+    args = arg_parser.parse_args()
+
+    map_file_arg = None
+    if args.map:
+        map_file_arg = args.map
+    elif args.map_flag:
+        map_file_arg = args.map_flag
+
+    verbose = args.verbose
+    color_terminal = args.color
 
     is_ansi = should_use_ansi()
     printer = FlyinPrinter()
     printer.is_ansi = is_ansi
 
-
     menu = FlyinMenu(printer)
     parser = FlyinParser()
+
     while True:
         while True:
-            if config_file_arg is None:
+            if map_file_arg is None:
                 printer.print_presentation()
                 menu.run_select_path_menu()
                 config_file = menu.get_path_to_config()
             else:
-                config_file = config_file_arg 
-            config_file_arg = None
+                config_file = map_file_arg
+            map_file_arg = None
 
-            graph = parse_and_init_graph(config_file, parser)
-
-            if not graph:
+            # The menu can come back with nothing selected.
+            if config_file is None:
                 continue
 
-            gui = FlyinGui(graph=graph)
+            parse_result = parse_and_init_graph(str(config_file), parser)
 
-            try:
-                if menu.run_confirm_file_map(graph.filename, menu):
-                    break
-            except KeyboardInterrupt:
-                history = orchestrator.run_orchestra()
-                orchestrator.export_turns()
+            if not parse_result:
+                wait_for_enter("Press ENTER to exit.")
+                sys.exit(1)
 
-        pathfinding = DijkstraPathfinding(graph)
-        orchestrator = Orchestrator(graph=graph, pathfinding=pathfinding)
+            filename, graph = parse_result
+            if menu.run_confirm_file_map(filename):
+                break
 
         manual = False
         direct = False
-        config = menu.run_configure_ui_menu(gui)
         delay = DELAY
+        config = menu.run_configure_ui_menu()
         if config == 0:
             manual = True
         elif config == 1:
@@ -127,35 +164,51 @@ def main() -> None:
             direct = True
             delay = DIRECT
 
-        terminal_gui = TerminalGui(
-            graph,
-            orchestrator.reservation_table,
-            history,
-            manual,
-            direct,
-            delay
-            )
-        terminal_gui.print_history()
-        
-            
+        pathfinding = DijkstraPathfinding(graph)
+        orchestrator = Orchestrator(graph=graph, pathfinding=pathfinding)
 
+        # Solvable map with disconnected islands: they can never take part
+        # in a delivery, so they are only worth a heads-up.
+        if pathfinding.is_end_reachable():
+            islands = pathfinding.unreachable_zones()
+            if islands:
+                print(
+                    "⚠ Warning: zone(s) with no route to the goal"
+                    f" (ignored): {', '.join(islands)}",
+                    file=sys.stderr,
+                )
 
-        # What I need to start another simulation ... ?
-        # Know if the user wants to do it, handled by try_again Menu
-        # 
-
-        wait_for_enter("\n Simulation finished, click enter...")
-        try_again = input("try aain")
-        if try_again == "si":
+        try:
+            history = orchestrator.run_orchestra()
+            # Write the schedule before replaying it, so an interrupted
+            # replay still leaves a complete output.txt behind.
+            orchestrator.export_turns()
+            terminal_gui = TerminalGui(
+                graph,
+                orchestrator.reservation_table,
+                history,
+                verbose,
+                manual,
+                direct,
+                color_terminal,
+                delay
+                )
+            terminal_gui.print_history()
+        except FlyinUnreachableError as e:
+            # Not a bug in the schedule: the map itself has no solution.
+            # Report it and let the user pick another one.
+            print(f"❌ {e}")
+            wait_for_enter("\n Choose another map...")
             continue
-        elif try_again == "no":
-            break
-        else:
+        except FlyinError as e:
+            print(e)
+            wait_for_enter("\n Exit the program gracefully.")
+            sys.exit(1)
+
+        title = "Simulation finished, do you want to continue?"
+        if menu.run_continue_menu(title) == 0:
             continue
-        
-
-
-
+        exit_program()
 
 
 if __name__ == "__main__":
@@ -164,4 +217,6 @@ if __name__ == "__main__":
     except EOFError:
         print("End of file reached. Exiting gracefully.")
     except KeyboardInterrupt:
-        print("Program interrupted by user (Ctrl+C). Exiting gracefully.")
+        print(
+            "Program interrupted by user (Ctrl+C). Exiting gracefully."
+            )

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from error import FlyinError
+from error import FlyinUnreachableError
 from orchestrator.orchestrator import Orchestrator
 from tests.helpers import make_graph, make_orchestrator
 
@@ -209,11 +209,11 @@ def test_record_turn_shows_occupancy_on_every_turn() -> None:
 # ---- deadlocks ----------------------------------------------------------
 
 
-def test_impossible_map_is_reported_as_a_deadlock(
+def test_impossible_map_is_reported_as_unreachable(
     blocked_dead_end_graph,
 ) -> None:
     orch = make_orchestrator(blocked_dead_end_graph)
-    with pytest.raises(FlyinError):
+    with pytest.raises(FlyinUnreachableError):
         orch.run_orchestra()
 
 

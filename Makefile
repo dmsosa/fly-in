@@ -9,7 +9,7 @@ WHITE := \033[97m
 
 PROJECT := Fly-in
 NAME    := main.py
-MAP     ?= maps/easy/01_linear_path.txt
+MAP     ?= maps/hard/02_capacity_hell.txt
 ARGS    ?=
 
 .PHONY: install install-req run debug test clean lint lint-strict help
@@ -42,12 +42,13 @@ install-req:
 	@source ./venv/bin/activate && pip install -r requirements.txt
 	@printf "$(GREEN)✓ Ready to run.$(RESET)\n"
 
-run: 
+run:
+	@eval $(poetry env activate)
 	@printf "$(BOLD)$(CYAN)→ Starting $(PROJECT)...$(RESET)\n\n"
-	@poetry run python3 $(NAME) $(ARGS) $(MAP)
+	@poetry run python3 $(NAME) $(MAP) $(ARGS)
 
 dev:
-	python3 $(NAME) maps/easy/01_linear_path.txt 2>log.txt
+	python3 $(NAME) $(ARGS) $(MAPS) 2>log.txt
 
 debug: install
 	@printf "$(BOLD)$(YELLOW)→ Starting debugger...$(RESET)\n"

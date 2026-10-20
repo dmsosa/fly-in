@@ -35,27 +35,10 @@ def slice_str(
     return new
 
 
-def hex_to_ansi_fg(hex_color: str) -> str:
-    """Convert '#rrggbb' to a 24-bit truecolor ANSI foreground escape."""
-    h = hex_color.lstrip("#")
-    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-    return f"\033[38;2;{r};{g};{b}m"
-
-
-def hex_to_ansi_bg(hex_color: str) -> str:
-    """Convert '#rrggbb' to a 24-bit truecolor ANSI background escape."""
-    h = hex_color.lstrip("#")
-    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-    return f"\033[48;2;{r};{g};{b}m"
-
-def clear_screen() -> None:
-    """Clears the console or terminal screen cleanly."""
-    os.system("cls" if os.name == "nt" else "clear")
-
-
 def is_terminal() -> bool:
     """Check if stdout is connected to a terminal (TTY)."""
     return sys.stdout.isatty()
+
 
 @lru_cache
 def supports_ansi() -> bool:
@@ -123,8 +106,6 @@ def move_cursor_right(columns: int) -> None:
 def move_cursor_up(rows: int) -> None:
     sys.stdout.write(f"\033[{rows}A")
 
-def move_cursor(row: int, col: int) -> None:
-    sys.stdout.write(f"\033[{row};{col}H")
 
 def exit_program() -> str:
     """Exits the application gracefully displaying parting graphics."""

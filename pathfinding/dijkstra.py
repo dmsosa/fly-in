@@ -20,30 +20,13 @@ class DijkstraPathfinding:
         if graph is None:
             raise FlyinError("Graph is not defined in Pathfinding")
         self.graph = graph
-        self._edges = self._build_edges()
         self.distance_map = self._build_distance_map()
 
     # ---- building ---------------------------------------------------
-    def _build_edges(self) -> dict[str, list[tuple[str, int]]]:
-        """Adjacency list ``zone -> [(neighbour, cost_to_enter)]``."""
-        edges: dict[str, list[tuple[str, int]]] = {}
-        for zone in self.graph.all_zones:
-            if zone.is_blocked():
-                continue
-            edges[zone.name] = [
-                (neighbour.name, neighbour.static_cost)
-                for neighbour in self.graph.get_neighbors(zone.name)
-                if not neighbour.is_blocked()
-            ]
-        return edges
-
     def _build_distance_map(self) -> dict[str, float]:
-        dmap = {
-            zone.name: math.inf
-            for zone in self.graph.all_zones
-            if not zone.is_blocked()
-        }
+        dmap = {zone.name: math.inf for zone in self.graph.all_zones}
         end = self.graph.end_zone
+
         if end is None:
             return dmap
 
@@ -93,3 +76,30 @@ class DijkstraPathfinding:
         """Return the single cheapest neighbour, or ``None`` when stuck."""
         ranked = self.find_best_zones(zone)
         return ranked[0] if ranked else None
+
+    # ---- reachability ------------------------------------------------
+    def is_end_reachable(self, start: str | None = None) -> bool:
+        """
+        ``True`` when ``start`` (the start hub by default) has a path to
+        the end zone.
+
+        The distance map is built backwards from the end over an
+        *undirected* graph, so a zone without a finite cost-to-go is
+        exactly a zone sitting in another connected component.
+        """
+        origin = start if start is not None else self.graph.start_zone.name
+        return self.distance_map.get(origin, math.inf) != math.inf
+
+    def unreachable_zones(self) -> list[str]:
+        """
+        Sorted names of every non-blocked zone with no route to the goal.
+
+        Used to explain *why* a map is unsolvable (case: the goal itself
+        is cut off) and to warn about stray islands on solvable maps.
+        """
+        return sorted(
+            zone.name
+            for zone in self.graph.all_zones
+            if not zone.is_blocked()
+            and self.distance_map.get(zone.name, math.inf) == math.inf
+        )

@@ -1,7 +1,6 @@
 import sys
 import time
 from typing import TYPE_CHECKING, Optional
-
 from .utils import clear_screen
 from .constants import THEME_CHAR, THEME_COLOR
 from .constants import MENU_WIDTH
@@ -36,7 +35,7 @@ class FlyinPrinter:
         Returns:
             str: Centered multiline ASCII string.
         """
-        ascii_art = r"""                                          
+        ascii_art = r"""
        ___  ___
      /'___\/\_ \                      __
     /\ \__/\//\ \    __  __          /\_\    ___
@@ -84,7 +83,6 @@ class FlyinPrinter:
         print(f"{accent}{self.title()}{reset}", end="\n" * 3)
         self.wait_for_enter(None)
 
-
     def wait_for_enter(self, message: Optional[str]) -> None:
         """Halts execution until the user presses the 'Enter' key.
 
@@ -95,7 +93,6 @@ class FlyinPrinter:
             message = "Press enter..."
         self.print_wrap(message)
         sys.stdin.readline()
-
 
     def print_goodbye(self) -> None:
         """Exits the application gracefully displaying parting graphics."""
@@ -122,7 +119,6 @@ class FlyinPrinter:
         else:
             self._print_menu_ascii(title, items, scale)
 
-
     def _print_lines_ascii(
             self,
             title: str,
@@ -148,18 +144,21 @@ class FlyinPrinter:
         empty_row = ver_bar + " " * scale * MENU_WIDTH + ver_bar
         lines = [
                 top_row,
-                ver_bar + "{:^{w}}".format(title, w=MENU_WIDTH * scale) + ver_bar,
+                ver_bar +
+                "{:^{w}}".format(title, w=MENU_WIDTH * scale) +
+                ver_bar,
                 empty_row
         ]
         for i in range(0, len(items)):
             item = items[i]
             lines.append(
-                ver_bar + "{:<{w}}".format(item, w=MENU_WIDTH * scale) + ver_bar
+                ver_bar +
+                "{:<{w}}".format(item, w=MENU_WIDTH * scale) +
+                ver_bar
             )
         lines.append(empty_row)
         lines.append(bot_row)
         print("\n".join(lines))
-
 
     def _print_lines_ansi(
         self,
@@ -211,7 +210,6 @@ class FlyinPrinter:
         lines.append(empty_row)
         lines.append(bot_row)
         print("\n".join(lines))
-
 
     def print_top_row(
             self,
@@ -307,11 +305,10 @@ class FlyinPrinter:
         else:
             self._print_menu_ascii(menu, mark, scale, frame)
 
-
     def _print_menu_ascii(
             self,
             menu: "Menu",
-            mark: bool = True,
+            mark: bool = False,
             scale: int = 3,
             frame: bool = False
             ) -> None:
@@ -329,17 +326,23 @@ class FlyinPrinter:
         corner_br = chars[3]
         hor_bar = chars[4]
         ver_bar = chars[5]
-        top_row = f"{corner_ul}" + hor_bar * MENU_WIDTH * scale + f"{corner_ur}"
-        bot_row = f"{corner_bl}" + hor_bar * MENU_WIDTH * scale + f"{corner_br}"
+        top_row = f"{corner_ul}" + \
+            hor_bar * MENU_WIDTH * scale + \
+            f"{corner_ur}"
+        bot_row = f"{corner_bl}" + \
+            hor_bar * MENU_WIDTH * scale + \
+            f"{corner_br}"
         empty_row = ver_bar + " " * MENU_WIDTH * scale + ver_bar
         if frame:
             lines = [
                 top_row,
-                ver_bar + "{:^{w}}".format(menu.name, w=MENU_WIDTH * scale) + ver_bar,
+                ver_bar +
+                "{:^{w}}".format(menu.name, w=MENU_WIDTH * scale) +
+                ver_bar,
                 empty_row
             ]
         else:
-            lines = []
+            lines = ["{:^{w}}".format(menu.name, w=MENU_WIDTH * scale)]
         for i in range(0, menu.items_len):
             item = menu.items[i]
             is_selected = " >>" if \
@@ -347,7 +350,9 @@ class FlyinPrinter:
                 else ""
             text = f"{is_selected} [{item.key}]: {item.label}"
             if frame:
-                line = ver_bar + "{:<{w}}".format(text, w=MENU_WIDTH * scale) + ver_bar
+                line = ver_bar + \
+                    "{:<{w}}".format(text, w=MENU_WIDTH * scale) + \
+                    ver_bar
             else:
                 line = "{:<{w}}".format(text, w=MENU_WIDTH * scale)
             lines.append(line)
@@ -356,11 +361,10 @@ class FlyinPrinter:
             lines.append(bot_row)
         print("\n".join(lines))
 
-
     def _print_menu_ansi(
             self,
             menu: "Menu",
-            mark: bool = True,
+            mark: bool = False,
             scale: int = 3,
             frame: bool = False
             ) -> None:
@@ -398,7 +402,8 @@ class FlyinPrinter:
                 empty_row
             ]
         else:
-            lines = []
+            lines = ["{:<{w}}".format(
+                    menu.name, w=MENU_WIDTH * scale)]
         for i in range(0, menu.items_len):
             item = menu.items[i]
             is_selected = " >>" if \
@@ -406,13 +411,16 @@ class FlyinPrinter:
                 else ""
             color = highlight if is_selected else ""
             reset_color = reset if is_selected else ""
-            text = f"{is_selected} [{item.key}]: {item.label}"
+            text = f"{is_selected} []: {item.label}"
             if frame:
-                line = accent_bar + color + text.ljust((MENU_WIDTH * scale)) + reset_color + accent_bar
+                line = accent_bar + \
+                    color + \
+                    text.ljust((MENU_WIDTH * scale)) + \
+                    reset_color + accent_bar
             else:
                 line = color + text.ljust((MENU_WIDTH * scale)) + reset_color
             lines.append(line)
-        
+
         if frame:
             lines.append(empty_row)
             lines.append(bot_row)

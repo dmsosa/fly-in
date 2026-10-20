@@ -91,3 +91,15 @@ def island_graph() -> FlyinGraph:
         zones=[{"name": "island", "coord": (5, 5)}],
         connections=[("start", "goal")],
     )
+
+
+@pytest.fixture
+def disconnected_graph() -> FlyinGraph:
+    """No route at all: ``start -- a`` on one side, ``goal`` alone."""
+    return make_graph(
+        drone_count=1,
+        start=("start", (0, 0)),
+        end=("goal", (5, 5)),
+        zones=[{"name": "a", "coord": (1, 0)}],
+        connections=[("start", "a")],
+    )

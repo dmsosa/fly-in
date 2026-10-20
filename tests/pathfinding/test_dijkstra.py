@@ -110,19 +110,40 @@ class TestFindBestZoneInvariants:
         assert pf.distance_map[best.name] == cheapest
 
 
-class TestAdjacencyList:
-    def test_weight_is_the_cost_to_enter_the_neighbour(
-        self, restricted_graph: FlyinGraph
-    ) -> None:
-        pf = DijkstraPathfinding(restricted_graph)
-        for neighbours in pf._edges.values():
-            for neighbour, weight in neighbours:
-                zone = restricted_graph.get_zone_by_name(neighbour)
-                assert weight == zone.static_cost
+class TestReachability:
+    """``is_end_reachable`` / ``unreachable_zones`` (disconnected maps)."""
 
-    def test_is_symmetric(self, linear_graph: FlyinGraph) -> None:
+    def test_connected_map_is_reachable(
+        self, linear_graph: FlyinGraph
+    ) -> None:
         pf = DijkstraPathfinding(linear_graph)
-        for name, neighbours in pf._edges.items():
-            for neighbour, _ in neighbours:
-                reverse = {n for n, _ in pf._edges[neighbour]}
-                assert name in reverse
+        assert pf.is_end_reachable() is True
+
+    def test_explicit_origin_is_supported(
+        self, linear_graph: FlyinGraph
+    ) -> None:
+        pf = DijkstraPathfinding(linear_graph)
+        assert pf.is_end_reachable("b") is True
+        assert pf.is_end_reachable("goal") is True
+
+    def test_no_exit_from_the_start_is_unreachable(
+        self, blocked_dead_end_graph: FlyinGraph
+    ) -> None:
+        pf = DijkstraPathfinding(blocked_dead_end_graph)
+        assert pf.is_end_reachable() is False
+        # Blocked zones are a deliberate choice, not an accident: they are
+        # excluded from the "no route" report.
+        assert pf.unreachable_zones() == ["start"]
+
+    def test_islands_are_listed_but_the_goal_is_reachable(
+        self, island_graph: FlyinGraph
+    ) -> None:
+        pf = DijkstraPathfinding(island_graph)
+        assert pf.is_end_reachable() is True
+        assert pf.unreachable_zones() == ["island"]
+
+    def test_fully_connected_map_has_no_unreachable_zone(
+        self, fork_graph: FlyinGraph
+    ) -> None:
+        pf = DijkstraPathfinding(fork_graph)
+        assert pf.unreachable_zones() == []

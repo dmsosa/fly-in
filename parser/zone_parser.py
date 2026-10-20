@@ -1,11 +1,10 @@
 from typing import Any
 
-from model import Zone
-
 
 class ZoneParseError(Exception):
     def __init__(self, *args):
         super().__init__(*args)
+
 
 class ZoneParser():
 

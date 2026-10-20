@@ -1,7 +1,7 @@
 import sys
 from typing import Any, Optional
 
-from error.error import FlyinError
+from error.error import FlyinError, FlyinUnreachableError
 from model.drone import Drone, DroneState
 from model.graph import Connection, FlyinGraph, HubType, Zone
 from orchestrator.reservation_table import ReservationTable
@@ -77,8 +77,29 @@ class Orchestrator:
         """O(1) lookup by drone id."""
         return self.drones.get(name)
 
+    def _check_goal_reachable(self) -> None:
+        """Raise ``FlyinUnreachableError`` when the map has no solution."""
+        if self.pathfinding.is_end_reachable():
+            return
+        unreachable = self.pathfinding.unreachable_zones()
+        detail = (
+            f" Zones without a route: {', '.join(unreachable)}."
+            if unreachable
+            else ""
+        )
+        raise FlyinUnreachableError(
+            f"Unreachable goal: no path from "
+            f"'{self.graph.start_zone.name}' to "
+            f"'{self.graph.end_zone.name}'.{detail}"
+        )
+
     # ---- simulation -------------------------------------------------
     def run_orchestra(self) -> list[list[Move]]:
+        # Refuse an unsolvable map before the first turn: without this the
+        # fleet would wait forever and the run would die later on the much
+        # less helpful "every drone is waiting" deadlock error.
+        self._check_goal_reachable()
+
         history: list[list[Move]] = []
         # Hard ceiling: a correct schedule delivers every drone well before
         # this, so hitting it means the fleet is oscillating/deadlocked.

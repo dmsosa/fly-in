@@ -1,16 +1,14 @@
 from time import sleep
-
-from gui.constants import BOLD, DIM, COLOR_MAP, MENU_WIDTH, RESET
-from gui.utils import clear_screen, wait_for_enter
-from model.graph import FlyinGraph
-from orchestrator.orchestrator import Move
-from orchestrator.reservation_table import ReservationTable
+from .constants import BOLD, DELAY, DIM, COLOR_MAP, MENU_WIDTH, RESET
+from .utils import clear_screen, wait_for_enter
+from model import FlyinGraph
+from orchestrator import Move, ReservationTable
 
 
 class TerminalGui:
     """
-    This class receives a list of movements (Move class) 
-    and displays them on the screen using ANSI escape sequences 
+    This class receives a list of movements (Move class)
+    and displays them on the screen using ANSI escape sequences
     for colorful output to the terminal
     """
     def __init__(
@@ -18,12 +16,20 @@ class TerminalGui:
             graph: FlyinGraph,
             reservation: ReservationTable,
             history: list[list[Move]],
-            display_usage: bool = True
+            display_usage: bool = True,
+            manual: bool = False,
+            direct: bool = False,
+            color: bool = True,
+            delay: float = DELAY
             ):
         self.graph = graph
         self.reservation = reservation
         self.history = history
         self.display_usage = display_usage
+        self.manual = manual
+        self.direct = direct
+        self.color_terminal = color
+        self.delay = delay
 
     def _colorize_rainbow(self, text: str, bold: bool = False) -> str:
         """
@@ -84,16 +90,27 @@ class TerminalGui:
             zone_b = self.graph.get_zone_by_name(target_b)
             color_a = zone_a.color if zone_a else None
             color_b = zone_b.color if zone_b else None
-            result: str = (
-                f"{move.drone_id}-"
-                f"{self.colorize(target_a, color_a, bold=True)}"
-                f"-{self.colorize(target_b, color_b, bold=True)}"
-            )
+
+            if self.color_terminal:
+                result: str = (
+                    f"{move.drone_id}-"
+                    f"{self.colorize(target_a, color_a, bold=True)}"
+                    f"-{self.colorize(target_b, color_b, bold=True)}"
+                )
+            else:
+                result: str = (
+                    f"{move.drone_id}-"
+                    f"{target_a}"
+                    f"-{target_b}"
+                )
             return result
 
         zone = self.graph.get_zone_by_name(move.target_name)
         color = zone.color if zone else None
-        return self.colorize(move.to_str(), color, bold=True)
+        if self.color_terminal:
+            return self.colorize(move.to_str(), color, bold=True)
+        else:
+            return move.to_str()
 
     def print_history(self) -> None:
         if self.direct:
@@ -105,7 +122,7 @@ class TerminalGui:
             if self.display_usage:
                 line.append(f"T{turn_id + 1}: ")
             turn_title = f" Turn {turn_id + 1:02d} ".center(MENU_WIDTH, "=")
-            print(f"\n{turn_title}\n")
+            print(f"\n{turn_title}")
             sorted_moves = sorted(turn, key=lambda s: s.drone_id)
             for move in sorted_moves:
                 line.append(self.format_move(move))
@@ -114,39 +131,72 @@ class TerminalGui:
                 self._display_zone_usage(turn_id)
                 self._display_conn_usage(turn_id)
             if self.manual:
-                wait_for_enter()
+                wait_for_enter("\n")
             if not self.direct and not self.manual:
                 sleep(self.delay)
+        print("\n\n\n")
 
     def _display_zone_usage(self, turn_id: int) -> None:
-        zone_usage_title = f" Zone usage {turn_id + 1} ".center(MENU_WIDTH, "*")
-        print(f"\n{zone_usage_title}\n")
+        zone_usage_title = (
+            f" Zone usage {turn_id + 1} ".center(MENU_WIDTH, "*")
+            )
+        print(f"\n{zone_usage_title}")
         zone_usage_line = []
         for zone in self.graph.all_zones:
-            zone_usage = self.reservation.zone_occupancy.get((zone.name, turn_id), 0)
+            zone_usage = self.reservation.zone_occupancy.get(
+                    (zone.name, turn_id),
+                    0
+                )
             if zone_usage == 0:
                 continue
-            name_styled = self.colorize(f"Zone: {zone.name:<12}", zone.color, True)
+            if self.color_terminal:
+                name_styled = self.colorize(
+                    f"Zone: {zone.name:<12}",
+                    zone.color,
+                    False
+                    )
+            else:
+                name_styled = f"Zone: {zone.name:<12}"
             type_styled = f"({zone.type.value})"
             zone_max_str = (
                 "inf" if zone.is_unlimited_capacity()
                 else str(zone.max_drones)
             )
             zone_str = (
-                f" - {name_styled} {type_styled:<14} {zone_usage:>2}/{zone_max_str:<3}"
+                f" - {name_styled} \
+                {type_styled:<14} \
+                {zone_usage:>2}/{zone_max_str:<3}"
             )
             zone_usage_line.append(zone_str)
         print("\n".join(zone_usage_line))
 
     def _display_conn_usage(self, turn_id: int) -> None:
         title = f" Connection usage {turn_id + 1} ".center(MENU_WIDTH, "+")
-        print(f"\n{title}\n")
+        print(f"\n{title}")
         conn_usage_line = []
         for conn in self.graph.connections:
             name_a, name_b = conn.key
-            conn_usage = self.reservation.link_occupancy.get(((name_a, name_b), turn_id), 0)
+            conn_usage = self.reservation.link_occupancy.get(
+                ((name_a, name_b), turn_id),
+                0)
             if conn_usage == 0:
                 continue
+            if self.color_terminal:
+                zone_a = self.graph.get_zone_by_name(name_a)
+                zone_b = self.graph.get_zone_by_name(name_b)
+                color_a = zone_a.color if zone_a else "white"
+                color_b = zone_b.color if zone_b else "white"
+                name_styled = (
+                    "Connection: "
+                    + self.colorize(f"{name_a}", color_a, False)
+                    + "-"
+                    + self.colorize(f"{name_b}", color_b, False)
+                )
+            else:
+                name_styled = f"- Connection: {name_a}-{name_b}"
             conn_max = conn.max_link_capacity
-            conn_usage_line.append(f"Connection '{name_a}-{name_b}': {conn_usage}/{conn_max}")
+            conn_str = (
+                f" - {name_styled} ({conn_usage}/{conn_max})"
+            )
+            conn_usage_line.append(conn_str)
         print("\n".join(conn_usage_line))

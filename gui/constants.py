@@ -1,8 +1,4 @@
 # STRINGS
-from itertools import count
-import re
-
-
 GRID_HEIGHT = 100
 GRID_WIDTH = 200
 UX_MAX: int = 500
@@ -10,10 +6,6 @@ UX_STD: int = 100
 DELAY: float = 0.5
 FAST_DELAY: float = 0.1
 DIRECT: float = 0.0
-path_id_generator = count(1)
-drone_helices = count(1)
-
-USERNAME_REGEXP = re.compile(r"[a-z0-9]{3,15}")
 
 
 THEME_CHAR = {
@@ -28,8 +20,8 @@ THEME_CHAR = {
 
 THEME_COLOR = {
     "bg":      "#000000",
-    "primary":    "#3c7758",
-    "secondary": "#279119",
+    "primary":    "#00d916",
+    "secondary": "#499A3E",
     "tertiary":   "#B5A724",
     "danger":   "#ff0000",
     "bg-secondary":     "#242424",

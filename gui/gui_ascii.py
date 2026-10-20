@@ -1,16 +1,10 @@
-from typing import Any, Optional
-from pydantic import BaseModel, Field
-from model import FlyinGraph, Zone
+from typing import Any
+from model import FlyinGraph
 from menu import FlyinMenu
 from orchestrator.orchestrator import Move
 from .utils import exit_program
 from .constants import UX_MAX, \
-UX_STD
-
-
-DELAY: float = 0.5
-FAST: float = 0.1
-DIRECT: float = 0.0
+                UX_STD
 
 
 class FlyinGui:
@@ -43,7 +37,6 @@ class FlyinGui:
         self.col, self.row = width, height
         pass
 
-    
     def confirm_map_file(self, map_name: str, menu: "FlyinMenu") -> bool:
         """Prompts the user to review and confirm the loaded map.
 

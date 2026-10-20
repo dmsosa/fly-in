@@ -42,7 +42,8 @@ the terminal.
 1. **Parses** a map file into a validated graph (`FlyinParser` + pydantic
    models).
 2. **Pre-computes** the cost-to-go of every zone with a reverse Dijkstra pass
-   (`DijkstraPathfinding`).
+   (`DijkstraPathfinding`), which doubles as the *reachability* test for
+   disconnected maps.
 3. **Simulates** turn by turn, letting the orchestrator own *all* capacity
    decisions and ask the pathfinder only for a *ranked* list of options
    (`Orchestrator`).
@@ -57,9 +58,11 @@ the terminal.
 - Two-turn restricted-zone crossings with a correct in-flight representation.
 - Anti ping-pong via a bounded per-drone "recently visited" memory.
 - Deadlock detection: a run fails fast with a clear error instead of hanging.
+- **Disconnected-map detection**: a goal with no route is refused before turn 1
+  (naming every zone without a path), and stray islands only produce a warning.
 - Interactive map-selection menu and a confirmation screen.
 - Colourised terminal replay with per-turn zone and connection usage.
-- A pytest suite (140+ tests) covering models, parser, pathfinding, the
+- A pytest suite (145+ tests) covering models, parser, pathfinding, the
   scheduler and every shipped map end to end.
 
 ## Instructions
@@ -118,13 +121,13 @@ make clean           # remove caches
 ```text
 .
 ├── main.py                     # entry point (menu -> parse -> run -> replay)
-├── error/                      # custom exception types
+├── error/                      # FlyinError, FlyinParseError, FlyinUnreachableError
 ├── model/
 │   ├── graph.py                # Zone, Connection, FlyinGraph (pydantic)
 │   ├── drone.py                # Drone state + bounded visited memory
 │   └── constants.py
 ├── parser/                     # line-by-line parser for the map format
-├── pathfinding/dijkstra.py     # reverse Dijkstra + ranked neighbours
+├── pathfinding/dijkstra.py     # reverse Dijkstra, ranking, reachability
 ├── orchestrator/
 │   ├── orchestrator.py         # turn loop, scheduling, Move, export
 │   └── reservation_table.py    # zone/link capacity bookkeeping
@@ -248,6 +251,24 @@ Dead ends (`inf`) are kept **last** instead of being removed, so the
 orchestrator can see all options; the strict-progress rule (below) makes sure
 they are never taken.
 
+The pathfinder keeps **no edge list of its own**: every neighbour lookup goes
+through `graph.get_neighbors()`, so the graph stays the single source of truth
+for the topology (no duplicated adjacency structure to keep in sync).
+
+Because the pass runs backwards over an *undirected* graph, a zone without a
+finite cost-to-go is exactly a zone in another connected component. Two small
+queries expose that:
+
+- `is_end_reachable(start=None)` — does the start hub have a route to the goal?
+- `unreachable_zones()` — sorted names of every non-blocked zone with no route.
+
+`Orchestrator.run_orchestra()` calls the first one **before the first turn**
+and raises `FlyinUnreachableError` naming the hubs and the stranded zones, and
+`main.py` catches it to send the user back to the map selector instead of
+dumping a traceback. On a *solvable* map the same `unreachable_zones()` query
+only produces a warning on `stderr`, because islands can never take part in a
+delivery anyway.
+
 ### 3. The orchestrator turn loop
 
 Each call to `next_turn()` runs two phases:
@@ -328,15 +349,19 @@ already-delivered drone — and delivered drones sit in the unlimited end hub.
 That neighbour is therefore either free or a start/end hub, so the minimum
 drone can always advance.
 
-Two guards turn a real deadlock into a clear error instead of an infinite loop:
+Three guards turn a broken run into a clear error instead of an infinite loop:
 
-- `run_orchestra` fails fast with `FlyinError("Deadlock detected: every drone is
+- `run_orchestra` refuses an **unsolvable map** on turn 0 with
+  `FlyinUnreachableError("Unreachable goal: no path from 'start' to 'goal'.
+  Zones without a route: …")` — a disconnected graph, or a route that only
+  exists through `blocked` zones;
+- it fails fast with `FlyinError("Deadlock detected: every drone is
   waiting.")` when a turn produces **no move at all**;
 - a hard ceiling (`4 × zones × drones + 50` turns) catches any oscillation.
 
-An impossible map (for example, the start zone's only neighbour is blocked)
-therefore raises instead of spinning forever, which is exactly what the test
-suite asserts.
+The unreachable check is what makes the impossible-map case honest: the
+message says *why* the map has no solution instead of blaming the schedule,
+and no `output.txt` is written for a run that never happened.
 
 ### 7. Complexity
 
@@ -454,9 +479,13 @@ The suite is organised by layer:
 - `tests/model/` — `Zone`, `Connection`, `FlyinGraph`, `Drone` semantics
   (costs, identity, capacity, bounded memory).
 - `tests/parser/` — the line parser, including malformed inputs.
-- `tests/pathfinding/` — the distance map and the ranked-neighbour invariants.
+- `tests/pathfinding/` — the distance map, the ranked-neighbour invariants
+  and the reachability queries (`is_end_reachable`, `unreachable_zones`).
 - `tests/orchestrator/` — per-turn behaviour: move formatting, restricted
   crossings, capacity limits, anti-ping-pong and deadlock reporting.
+- `tests/orchestrator/test_disconnected.py` — unsolvable maps are refused on
+  turn 0 (`FlyinUnreachableError`), while a solvable map with disconnected
+  islands still delivers 100 %.
 - `tests/test_maps_integration.py` — runs **every** file in `maps/` through the
   full pipeline and asserts 100 % delivery plus a well-formed `output.txt`.
 
@@ -512,6 +541,9 @@ and adapted before being kept.
   snapshots), so the GUI can be rich without slowing the scheduler down.
 - **Fail fast on deadlock** turns a would-be infinite loop into a clear,
   actionable error.
+- **Reachability as a query, not a second search** — the reverse distance map
+  already tells whether the start hub can reach the goal, so detecting a
+  disconnected graph costs nothing extra (no duplicate Dijkstra pass).
 
 ## Known limitations / roadmap
 
