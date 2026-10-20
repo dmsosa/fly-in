@@ -1,6 +1,5 @@
 import heapq
 import math
-
 from error.error import FlyinError
 from model import FlyinGraph
 from model.graph import Zone
@@ -45,6 +44,74 @@ class DijkstraPathfinding:
                     heapq.heappush(zones_left, (new_cost, neighbour.name))
         return dmap
 
+    # ---- find all the paths, regardless of if it is the shortest or not ----
+    def find_all_paths(self) -> list[str]:
+        # To build a way, I dont need the cost, since I dont want to compare them
+        all_paths = []
+        visited = set()
+        parents = {self.graph.start_zone.name: None}
+        end_zone_name = self.graph.end_zone.name
+        queue = [self.graph.start_zone.name]
+
+        while queue:
+            zone_name = heapq.heappop(queue)
+            visited.add(zone_name)
+            if zone_name == end_zone_name:
+                path = self._build_path(zone_name, parents)
+                all_paths.append(path)
+            for neighbour in self.graph.get_neighbors(zone_name):
+                if neighbour.is_blocked():
+                    continue
+                if neighbour.name in visited:
+                    continue
+                parents[neighbour.name] = zone_name
+                heapq.heappush(queue, neighbour.name)
+        return all_paths
+
+    def find_shortest_path(self) -> list[str]:
+        # To build a way, I dont need the cost, since I dont want to compare them
+        start_name = self.graph.start_zone.name
+        visited = set()
+        parents = {start_name: None}
+        costs = {start_name: 0}
+        end_zone_name = self.graph.end_zone.name
+        queue = []
+
+        queue.append((0, start_name))
+        while queue:
+            current_cost, current_name = queue.pop()
+            visited.add(current_name)
+            if current_name == end_zone_name:
+                return self._build_path(current_name, parents)
+            for neighbour in self.graph.get_neighbors(current_name):
+                if neighbour.is_blocked():
+                    continue
+                if neighbour.name in visited:
+                    continue
+                # Sum the cost that you have already
+                # With the cost to enter the neighbour
+                # Depending on zone type
+                new_cost = current_cost + neighbour.static_cost
+                if new_cost < costs.get(neighbour.name, math.inf):
+                    costs[neighbour.name] = new_cost
+                    parents[neighbour.name] = current_name
+                    heapq.heappush(queue, neighbour.name)
+        return []
+
+    @staticmethod
+    def _build_path(
+        from_zone: str,
+        parents: dict[str, str]
+        ) -> list[str]:
+        result = [from_zone]
+        current = from_zone
+        while (current is not None):
+            result.append(current)
+            current = parents.get(current, None)
+        result.reverse()
+        return result
+    
+    
     # ---- ranking ----------------------------------------------------
     def find_best_zones(self, zone: Zone) -> list[Zone]:
         """

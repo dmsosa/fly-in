@@ -1,20 +1,19 @@
 """Tests for the whole-path queries on ``DijkstraPathfinding``.
 
-These two methods do not exist yet; the tests define the contract they are
-expected to honour and are skipped until the methods appear, so the suite
-stays green in the meantime.
+The methods take no arguments: they answer for the graph's own start/end
+hubs.
 
-Contract
---------
-``find_shortest_path(start: str, end: str) -> list[str]``
-    Zone *names*, both endpoints included, whose total ``static_cost`` is
-    minimal.  ``[]`` when no route exists (or a name is unknown).  A start
-    equal to the end yields ``[start]``.
+``find_shortest_path() -> list[str]``
+    Zone *names* from ``graph.start_zone`` to ``graph.end_zone`` whose total
+    cost is minimal (the same cost as ``distance_map[start]``), both
+    endpoints included exactly once. ``[]`` when no route exists.
 
-``find_all_paths(start: str, end: str) -> list[list[str]]``
-    Every *simple* path (no zone visited twice) between the two names, as
-    lists of names, endpoints included.  Current implementation order is not
-    assumed -- paths are compared as sets -- but repeated calls must agree.
+``find_all_paths() -> list[list[str]]``
+    Every *simple* path between the two hubs (no zone twice), endpoints
+    included, no duplicates. ``[]`` when no route exists.
+
+``_build_path`` is the shared helper both methods rely on, so it is pinned
+down directly as well.
 """
 from __future__ import annotations
 
@@ -25,15 +24,6 @@ import pytest
 from model.graph import FlyinGraph
 from pathfinding.dijkstra import DijkstraPathfinding
 from tests.helpers import make_graph
-
-needs_shortest_path = pytest.mark.skipif(
-    not hasattr(DijkstraPathfinding, "find_shortest_path"),
-    reason="DijkstraPathfinding.find_shortest_path is not implemented",
-)
-needs_all_paths = pytest.mark.skipif(
-    not hasattr(DijkstraPathfinding, "find_all_paths"),
-    reason="DijkstraPathfinding.find_all_paths is not implemented",
-)
 
 
 # ---- helpers ------------------------------------------------------------
@@ -121,13 +111,35 @@ def cycle_graph() -> FlyinGraph:
     )
 
 
+# ---- shared helper -------------------------------------------------------
+class TestBuildPath:
+    """``_build_path`` turns a parent map into a start-to-end path."""
+
+    def test_single_zone(self) -> None:
+        assert DijkstraPathfinding._build_path(
+            {"start": None}, "start"
+        ) == ["start"]
+
+    def test_includes_both_endpoints_once(self) -> None:
+        parents = {"start": None, "a": "start", "goal": "a"}
+        assert DijkstraPathfinding._build_path(
+            parents, "goal"
+        ) == ["start", "a", "goal"]
+
+    def test_longer_chain(self) -> None:
+        parents = {
+            "start": None, "a": "start", "b": "a", "goal": "b",
+        }
+        assert DijkstraPathfinding._build_path(
+            parents, "goal"
+        ) == ["start", "a", "b", "goal"]
+
+
 # ---- find_shortest_path --------------------------------------------------
-@needs_shortest_path
 class TestFindShortestPath:
     def test_follows_the_only_route(self, linear_graph: FlyinGraph) -> None:
         pf = DijkstraPathfinding(linear_graph)
-        path = pf.find_shortest_path("start", "goal")
-        assert path == ["start", "a", "b", "goal"]
+        assert pf.find_shortest_path() == ["start", "a", "b", "goal"]
 
     @pytest.mark.parametrize(
         "fixture_name",
@@ -139,6 +151,7 @@ class TestFindShortestPath:
             "diamond_graph",
             "priority_graph",
             "cycle_graph",
+            "island_graph",
         ],
     )
     def test_has_the_optimal_cost(
@@ -148,7 +161,7 @@ class TestFindShortestPath:
         graph: FlyinGraph = request.getfixturevalue(fixture_name)
         pf = DijkstraPathfinding(graph)
 
-        path = pf.find_shortest_path("start", "goal")
+        path = pf.find_shortest_path()
         assert_valid_path(graph, path, "start", "goal")
         assert zone_cost(graph, path) == pytest.approx(
             pf.distance_map["start"]
@@ -159,7 +172,7 @@ class TestFindShortestPath:
     ) -> None:
         """On a shortest path every step must reduce the cost-to-go."""
         pf = DijkstraPathfinding(diamond_graph)
-        path = pf.find_shortest_path("start", "goal")
+        path = pf.find_shortest_path()
 
         remaining = [pf.distance_map[name] for name in path]
         for before, after in zip(remaining, remaining[1:]):
@@ -169,60 +182,78 @@ class TestFindShortestPath:
         self, priority_graph: FlyinGraph
     ) -> None:
         pf = DijkstraPathfinding(priority_graph)
-        path = pf.find_shortest_path("start", "goal")
+        path = pf.find_shortest_path()
 
-        assert "p" in path
-        assert "n" not in path
+        assert path == ["start", "p", "goal"]
         assert zone_cost(priority_graph, path) == pytest.approx(1.5)
 
     def test_never_crosses_a_blocked_zone(
         self, blocked_graph: FlyinGraph
     ) -> None:
         pf = DijkstraPathfinding(blocked_graph)
-        path = pf.find_shortest_path("start", "goal")
-        assert "wall" not in path
-
-    def test_start_equal_to_end(self, linear_graph: FlyinGraph) -> None:
-        pf = DijkstraPathfinding(linear_graph)
-        assert pf.find_shortest_path("start", "start") == ["start"]
+        assert "wall" not in pf.find_shortest_path()
 
     def test_unreachable_goal_returns_empty(
         self, disconnected_graph: FlyinGraph
     ) -> None:
         pf = DijkstraPathfinding(disconnected_graph)
-        assert pf.find_shortest_path("start", "goal") == []
-
-    def test_unknown_zone_returns_empty(
-        self, linear_graph: FlyinGraph
-    ) -> None:
-        pf = DijkstraPathfinding(linear_graph)
-        assert pf.find_shortest_path("start", "nope") == []
-        assert pf.find_shortest_path("nope", "goal") == []
+        assert pf.find_shortest_path() == []
 
     def test_path_on_a_cyclic_graph_has_no_repetition(
         self, cycle_graph: FlyinGraph
     ) -> None:
         pf = DijkstraPathfinding(cycle_graph)
-        path = pf.find_shortest_path("start", "goal")
+        path = pf.find_shortest_path()
         assert_valid_path(cycle_graph, path, "start", "goal")
+
+    def test_result_is_deterministic(
+        self, diamond_graph: FlyinGraph
+    ) -> None:
+        pf = DijkstraPathfinding(diamond_graph)
+        assert pf.find_shortest_path() == pf.find_shortest_path()
+
+    def test_uses_the_same_cost_model_as_the_distance_map(
+        self, diamond_graph: FlyinGraph
+    ) -> None:
+        """Planning must not depend on live occupancy.
+
+        ``distance_map`` is static, and capacity is enforced by the
+        orchestrator, so a path query whose answer changes when a zone is
+        crowded cannot agree with the map it is supposed to explain.
+        """
+        pf = DijkstraPathfinding(diamond_graph)
+        before = pf.find_shortest_path()
+
+        crowded = diamond_graph.get_zone_by_name("a")
+        assert crowded is not None
+        crowded.drone_count = 5
+
+        assert pf.find_shortest_path() == before
 
 
 # ---- find_all_paths ------------------------------------------------------
-@needs_all_paths
 class TestFindAllPaths:
+    def test_returns_lists_of_names(
+        self, diamond_graph: FlyinGraph
+    ) -> None:
+        pf = DijkstraPathfinding(diamond_graph)
+        paths = pf.find_all_paths()
+        assert paths
+        for path in paths:
+            assert isinstance(path, list)
+            assert all(isinstance(name, str) for name in path)
+
     def test_linear_map_has_one_path(
         self, linear_graph: FlyinGraph
     ) -> None:
         pf = DijkstraPathfinding(linear_graph)
-        assert pf.find_all_paths("start", "goal") == [
-            ["start", "a", "b", "goal"]
-        ]
+        assert pf.find_all_paths() == [["start", "a", "b", "goal"]]
 
     def test_diamond_map_has_two_paths(
         self, diamond_graph: FlyinGraph
     ) -> None:
         pf = DijkstraPathfinding(diamond_graph)
-        found = {tuple(path) for path in pf.find_all_paths("start", "goal")}
+        found = {tuple(path) for path in pf.find_all_paths()}
         assert found == {
             ("start", "a", "goal"),
             ("start", "b", "goal"),
@@ -233,10 +264,20 @@ class TestFindAllPaths:
     ) -> None:
         """A cycle must not produce an infinite family of walks."""
         pf = DijkstraPathfinding(cycle_graph)
-        found = {tuple(path) for path in pf.find_all_paths("start", "goal")}
+        found = {tuple(path) for path in pf.find_all_paths()}
         assert found == {
             ("start", "b", "goal"),
             ("start", "a", "b", "goal"),
+        }
+
+    def test_fork_map_lists_both_routes(
+        self, fork_graph: FlyinGraph
+    ) -> None:
+        pf = DijkstraPathfinding(fork_graph)
+        found = {tuple(path) for path in pf.find_all_paths()}
+        assert found == {
+            ("start", "a", "goal"),
+            ("start", "c", "d", "e", "goal"),
         }
 
     @pytest.mark.parametrize(
@@ -248,7 +289,7 @@ class TestFindAllPaths:
         graph: FlyinGraph = request.getfixturevalue(fixture_name)
         pf = DijkstraPathfinding(graph)
 
-        paths = pf.find_all_paths("start", "goal")
+        paths = pf.find_all_paths()
         assert paths, "these maps do have routes"
         for path in paths:
             assert_valid_path(graph, path, "start", "goal")
@@ -257,37 +298,34 @@ class TestFindAllPaths:
         self, diamond_graph: FlyinGraph
     ) -> None:
         pf = DijkstraPathfinding(diamond_graph)
-        paths = pf.find_all_paths("start", "goal")
+        paths = pf.find_all_paths()
         assert len(paths) == len({tuple(path) for path in paths})
 
     def test_never_crosses_a_blocked_zone(
         self, blocked_graph: FlyinGraph
     ) -> None:
         pf = DijkstraPathfinding(blocked_graph)
-        for path in pf.find_all_paths("start", "goal"):
+        for path in pf.find_all_paths():
             assert "wall" not in path
 
     def test_unreachable_goal_returns_empty(
         self, disconnected_graph: FlyinGraph
     ) -> None:
         pf = DijkstraPathfinding(disconnected_graph)
-        assert pf.find_all_paths("start", "goal") == []
+        assert pf.find_all_paths() == []
 
     def test_result_is_deterministic(
         self, diamond_graph: FlyinGraph
     ) -> None:
         pf = DijkstraPathfinding(diamond_graph)
-        first = pf.find_all_paths("start", "goal")
-        second = pf.find_all_paths("start", "goal")
-        assert first == second
+        assert pf.find_all_paths() == pf.find_all_paths()
 
-    @needs_shortest_path
     def test_contains_the_shortest_path(
         self, diamond_graph: FlyinGraph
     ) -> None:
         pf = DijkstraPathfinding(diamond_graph)
-        paths = pf.find_all_paths("start", "goal")
-        best = pf.find_shortest_path("start", "goal")
+        paths = pf.find_all_paths()
+        best = pf.find_shortest_path()
 
         assert tuple(best) in {tuple(path) for path in paths}
         cheapest = min(zone_cost(diamond_graph, p) for p in paths)
@@ -297,5 +335,5 @@ class TestFindAllPaths:
         self, cycle_graph: FlyinGraph
     ) -> None:
         pf = DijkstraPathfinding(cycle_graph)
-        for path in pf.find_all_paths("start", "goal"):
+        for path in pf.find_all_paths():
             assert math.isfinite(zone_cost(cycle_graph, path))
