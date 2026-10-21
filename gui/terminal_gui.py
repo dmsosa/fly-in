@@ -14,18 +14,12 @@ class TerminalGui:
     def __init__(
             self,
             graph: FlyinGraph,
-            reservation: ReservationTable,
-            history: list[list[Move]],
-            display_usage: bool = True,
             manual: bool = False,
             direct: bool = False,
             color: bool = True,
             delay: float = DELAY
             ):
         self.graph = graph
-        self.reservation = reservation
-        self.history = history
-        self.display_usage = display_usage
         self.manual = manual
         self.direct = direct
         self.color_terminal = color

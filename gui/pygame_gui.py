@@ -1,6 +1,9 @@
 from typing import Any
 from pydantic import BaseModel, Field
+import pygame
 from model import FlyinGraph
+from orchestrator.orchestrator import Move
+from orchestrator.reservation_table import ReservationTable
 
 
 class FlyinPygameGui(BaseModel):
@@ -35,3 +38,55 @@ class FlyinPygameGui(BaseModel):
         scale_y = (self.height - 2 * self.padding) / range_y
         self.scale = min(scale_x, scale_y)
         pass
+
+        def draw_graph(self) -> None:
+            pass
+
+        def print_history(self, history: list[list[Move]], reservations: ReservationTable) -> None:
+            """simple loop"""
+            clock = pygame.time.Clock()
+            current_time = 0.0
+            turns_per_second = 2.5
+            max_turn = max([zone_occupancy[1] for zone_occupancy in reservations.zone_occupancy.keys()])
+            pygame.font.init()
+            font = pygame.font.SysFont('./static/RobotoMono.ttf', 22)
+
+            running = True
+            while running:
+                dt = clock.tick(60) / 1000.0
+                # Handling pygame events like key pressings
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        running = False
+                    elif event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_SPACE:
+                            current_time = 0.0
+                        if event.key == pygame.K_ESCAPE:
+                            running = False
+
+                if current_time < max_turn:
+                    current_time += dt * turns_per_second
+                self.screen.fill(pygame.Color("black"))
+                self.draw_graph()
+
+                for drone_id, path in self.drone_paths.items():
+                    px, py = self.get_drone_pixel_pos(path, current_time)
+                    self.draw_drone_glow(px, py, glow_color=(
+                        255, 255, 255), glow_radius=16, alpha=75)
+
+                for drone_id, path in self.drone_paths.items():
+                    px, py = self.get_drone_pixel_pos(path, current_time)
+                    pygame.draw.circle(self.screen, pygame.Color(
+                        "black"), (px, py), radius=6)
+                    pygame.draw.circle(self.screen, pygame.Color(
+                        "white"), (px, py), radius=6, width=1)
+
+                esc_text = font.render("Press ESC to quit",
+                                    True, pygame.Color("#ffffff"))
+                space_text = font.render(
+                    "Press SPACE to reset", True, pygame.Color("#ffffff"))
+                self.screen.blit(esc_text, (20, self.height - 50))
+                self.screen.blit(space_text, (20, self.height - 25))
+
+                pygame.display.flip()
+            pygame.quit()

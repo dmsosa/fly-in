@@ -106,18 +106,20 @@ class Zone(BaseModel):
         """
         return self.max_drones is None
 
+
 class Connection(BaseModel):
     zone_a: str
     zone_b: str
     max_link_capacity: int = Field(default=1, gt=0)
-    drone_count:  int =  Field(default=0, ge=0)
+    drone_count: int = Field(default=0, ge=0)
 
     @model_validator(mode="after")
     def not_circular_connection(self) -> "Connection":
         if self.zone_a == self.zone_b:
             raise PydanticCustomError(
                 "self_connection",
-                f"Invalid connection: {self.zone_a} and {self.zone_b} are the same hub."
+                f"Invalid connection: {self.zone_a} and \
+                {self.zone_b} are the same hub."
                 )
         return self
 
@@ -158,7 +160,10 @@ class FlyinGraph(BaseModel):
     zones: list[Zone] = Field(default_factory=list)
     connections: list[Connection] = Field(default_factory=list)
     all_zones: list[Zone] = Field(default_factory=list)
-    adjacency_list: dict[str, list[tuple[str, int]]] = Field(default_factory=dict)
+    adjacency_list: dict[
+        str,
+        list[tuple[str, int]]
+        ] = Field(default_factory=dict)
 
     # Model validation after -------------------------------------
     @model_validator(mode="after")
@@ -176,13 +181,13 @@ class FlyinGraph(BaseModel):
         - all drones know point to end_zone
         - all zones have a property which points to
         their links, it means, all the zones it is linked to
-        via a Connection 
+        via a Connection
         """
         self.all_zones = self.zones + [self.start_zone, self.end_zone]
         all_zones_count = len(self.all_zones)
 
         unique_names = {z.name for z in self.all_zones}
-        if  all_zones_count != len(unique_names):
+        if all_zones_count != len(unique_names):
             all_zones_len = len(self.all_zones)
             found = False
             for i in range(0, all_zones_len):
@@ -237,14 +242,16 @@ class FlyinGraph(BaseModel):
             if zone_a == zone_b:
                 raise PydanticCustomError(
                     "self_connection",
-                    f"Invalid connection: {zone_a} and {zone_b} are the same hub."
+                    f"Invalid connection: {zone_a} and {zone_b} \
+                    are the same hub."
                 )
 
             for z in [zone_a, zone_b]:
                 if z not in unique_names:
                     raise PydanticCustomError(
                         "zone_name_in_connection_not_exist",
-                        f"Zone name {z} does not exist. Failed to create connection."
+                        f"Zone name {z} does not exist. \
+                        Failed to create connection."
                     )
 
         self._build_indexes()

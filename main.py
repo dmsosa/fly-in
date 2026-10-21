@@ -96,14 +96,7 @@ def main() -> None:
         action="store_true",
         help="Enable colored visual terminal display and metrics",
     )
-    # Verbose Debug Add-On
-    arg_parser.add_argument(
-        "-v",
-        "--verbose",
-        default=False,
-        action="store_true",
-        help="Enable debug informations",
-    )
+
 
     args = arg_parser.parse_args()
 
@@ -180,20 +173,15 @@ def main() -> None:
 
         try:
             history = orchestrator.run_orchestra()
-            # Write the schedule before replaying it, so an interrupted
-            # replay still leaves a complete output.txt behind.
             orchestrator.export_turns()
             terminal_gui = TerminalGui(
                 graph,
-                orchestrator.reservation_table,
-                history,
-                verbose,
                 manual,
                 direct,
                 color_terminal,
                 delay
                 )
-            terminal_gui.print_history()
+            terminal_gui.print_history(history, orchestrator.reservation_table)
         except FlyinUnreachableError as e:
             # Not a bug in the schedule: the map itself has no solution.
             # Report it and let the user pick another one.
@@ -205,7 +193,7 @@ def main() -> None:
             wait_for_enter("\n Exit the program gracefully.")
             sys.exit(1)
 
-        title = "Simulation finished, do you want to continue?"
+        title = "The program work finished, do you want to continue?"
         if menu.run_continue_menu(title) == 0:
             continue
         exit_program()

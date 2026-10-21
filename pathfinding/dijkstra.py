@@ -45,73 +45,117 @@ class DijkstraPathfinding:
         return dmap
 
     # ---- find all the paths, regardless of if it is the shortest or not ----
-    def find_all_paths(self) -> list[str]:
-        # To build a way, I dont need the cost, since I dont want to compare them
-        all_paths = []
-        visited = set()
-        parents = {self.graph.start_zone.name: None}
+    def find_all_paths(self) -> list[list[str]]:
+        """
+        Enumerate every *simple* path (no zone visited twice) from the
+        start hub to the end hub, in DFS order.
+
+        Every branch carries its own ``parents`` / ``visited`` copies, so
+        branches never share history: that is what turns this from a
+        single spanning-tree walk into real path enumeration.
+
+        Args:
+            max_paths: optional cap on how many paths are collected, to
+                keep the (exponential) enumeration bounded.
+
+        Returns:
+            The list of paths (each a list of zone names), ``[]`` when the
+            goal cannot be reached.
+        """
+        all_paths: list[list[str]] = []
+        max_paths = min(self.graph.drone_count, 50)
+        max_paths_count = 0
+        start = self.graph.start_zone.name
         end_zone_name = self.graph.end_zone.name
-        queue = [self.graph.start_zone.name]
+        first_parents: dict[str, str | None] = {start: None}
+        first_visited: set[str] = set()
+        first_visited.add(start)
+        queue: list[tuple[str, dict[str, str | None], set[str]]] = [
+            (start, first_parents, first_visited)
+        ]
 
         while queue:
-            zone_name = heapq.heappop(queue)
-            visited.add(zone_name)
+            zone_name, parents, visited = queue.pop()
+
+            # The goal ends a path: never walk past it, or paths that
+            # continue beyond the destination would be emitted too.
             if zone_name == end_zone_name:
-                path = self._build_path(zone_name, parents)
-                all_paths.append(path)
+                all_paths.append(self._build_path(zone_name, parents))
+                max_paths_count += 1
+                if max_paths_count >= max_paths:
+                    break
+                continue
+
             for neighbour in self.graph.get_neighbors(zone_name):
                 if neighbour.is_blocked():
                     continue
                 if neighbour.name in visited:
                     continue
-                parents[neighbour.name] = zone_name
-                heapq.heappush(queue, neighbour.name)
+                # A dead end with no route to the goal is not worth a
+                # branch of its own.
+                if self.distance_map.get(neighbour.name, math.inf) == math.inf:
+                    continue
+                new_parents = dict(parents)
+                new_parents[neighbour.name] = zone_name
+                new_visited = set(visited)
+                new_visited.add(neighbour.name)
+                queue.append(
+                    (neighbour.name, new_parents, new_visited)
+                )
         return all_paths
 
     def find_shortest_path(self) -> list[str]:
-        # To build a way, I dont need the cost, since I dont want to compare them
-        start_name = self.graph.start_zone.name
-        visited = set()
-        parents = {start_name: None}
-        costs = {start_name: 0}
-        end_zone_name = self.graph.end_zone.name
-        queue = []
+        """
+        Cheapest start-to-goal path, as a list of zone names.
 
-        queue.append((0, start_name))
+        A standard Dijkstra over the same ``static_cost`` model that feeds
+        ``distance_map``, so the returned path always agrees with the map
+        the orchestrator follows. ``[]`` when the goal is unreachable.
+        """
+        start_name = self.graph.start_zone.name
+        parents: dict[str, str | None] = {start_name: None}
+        costs: dict[str, float] = {start_name: 0}
+        end_zone_name = self.graph.end_zone.name
+        queue: list[tuple[float, str]] = [(0.0, start_name)]
+
         while queue:
-            current_cost, current_name = queue.pop()
-            visited.add(current_name)
-            if current_name == end_zone_name:
-                return self._build_path(current_name, parents)
+            current_cost, current_name = heapq.heappop(queue)
+            if current_cost > costs[current_name]:
+                continue
             for neighbour in self.graph.get_neighbors(current_name):
                 if neighbour.is_blocked():
-                    continue
-                if neighbour.name in visited:
                     continue
                 # Sum the cost that you have already
                 # With the cost to enter the neighbour
                 # Depending on zone type
                 new_cost = current_cost + neighbour.static_cost
-                if new_cost < costs.get(neighbour.name, math.inf):
-                    costs[neighbour.name] = new_cost
-                    parents[neighbour.name] = current_name
-                    heapq.heappush(queue, neighbour.name)
+                if new_cost >= costs.get(neighbour.name, math.inf):
+                    continue
+                costs[neighbour.name] = new_cost
+                parents[neighbour.name] = current_name
+                heapq.heappush(queue, (new_cost, neighbour.name))
+            if current_name == end_zone_name:
+                return self._build_path(current_name, parents)
         return []
 
     @staticmethod
     def _build_path(
         from_zone: str,
-        parents: dict[str, str]
-        ) -> list[str]:
-        result = [from_zone]
-        current = from_zone
-        while (current is not None):
+        parents: dict[str, str | None],
+    ) -> list[str]:
+        """
+        Walk the ``parents`` map backwards into a start-to-goal path.
+
+        ``parents[start]`` is ``None``, which is what terminates the walk.
+        """
+        result: list[str] = []
+        current: str | None = from_zone
+        while current is not None:
             result.append(current)
-            current = parents.get(current, None)
+            current = parents.get(current)
         result.reverse()
         return result
-    
-    
+
     # ---- ranking ----------------------------------------------------
     def find_best_zones(self, zone: Zone) -> list[Zone]:
         """

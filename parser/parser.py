@@ -1,8 +1,7 @@
-import math
 from pathlib import Path
 from typing import Any
 from .connection_parser import ConnectionParser
-from .zone_parser import ZoneParseError, ZoneParser
+from .zone_parser import ZoneParser
 from error import FlyinParseError
 
 
@@ -88,14 +87,20 @@ class FlyinParser:
                 result_dict["zones"].append(zone_data)
             elif key == "start_hub":
                 if result_dict["start_zone"] is not None:
-                    raise FlyinParseError(f"There must be exactly one start_hub. [Line: {row + 1}]")
+                    raise FlyinParseError(
+                        f"There must be exactly one start_hub. \
+                        [Line: {row + 1}]"
+                        )
                 zone_data = ZoneParser.parse(data)
                 zone_data["hub_type"] = "start"
                 zone_data["max_drones"] = None
                 result_dict["start_zone"] = zone_data
             elif key == "end_hub":
                 if result_dict["end_zone"] is not None:
-                    raise FlyinParseError(f"There must be exactly one end_hub. [Line: {row + 1}]")
+                    raise FlyinParseError(
+                        f"There must be exactly one end_hub. \
+                        [Line: {row + 1}]"
+                        )
                 zone_data = ZoneParser.parse(data)
                 zone_data["hub_type"] = "end"
                 zone_data["max_drones"] = None
@@ -107,23 +112,34 @@ class FlyinParser:
                 if result_dict["drone_count"] is not None:
                     msg = "" \
                         f"Not valid configuration file {file_path}\n" \
-                        f"The 'nb_count' option was defined more than once.\n" \
-                        f"   └── first value was: {result_dict['drone_count']}" \
+                        f"The 'nb_count' option was \
+                            defined more than once.\n" \
+                        f"   └── first value was: \
+                            {result_dict['drone_count']}" \
                         f"   └── [Line {row + 1}]" \
-                    ""
+                        ""
                     raise FlyinParseError(msg)
                 try:
                     value = int(data)
                     result_dict["drone_count"] = value
                     first_line_nb_drones = True
                 except ValueError:
-                    raise FlyinParseError(f"Invalid value for drone count: '{data}'. [Line {row + 1}]")
-    
+                    raise FlyinParseError(
+                        f"Invalid value for drone count: \
+                        '{data}'. [Line {row + 1}]"
+                        )
+
         if not result_dict["start_zone"]:
-            raise FlyinParseError("Mandatory key for parser is missing: 'start_hub'.")
+            raise FlyinParseError(
+                "Mandatory key for parser is missing: 'start_hub'."
+                )
         if not result_dict["end_zone"]:
-            raise FlyinParseError("Mandatory key for parser is missing: 'end_hub'.")
+            raise FlyinParseError(
+                "Mandatory key for parser is missing: 'end_hub'."
+                )
         if not result_dict["drone_count"]:
-            raise FlyinParseError("Mandatory key for parser is missing: 'nb_drones'.")
+            raise FlyinParseError(
+                "Mandatory key for parser is missing: 'nb_drones'."
+                )
 
         return result_dict
