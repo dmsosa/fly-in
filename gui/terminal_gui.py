@@ -106,14 +106,19 @@ class TerminalGui:
         else:
             return move.to_str()
 
-    def print_history(self) -> None:
+    def print_history(
+            self,
+            history: list[list[Move]],
+            reservations: ReservationTable,
+            verbose: bool = False
+    ) -> None:
         if self.direct:
             clear_screen()
 
-        for turn in self.history:
+        for turn in history:
             turn_id = turn[0].turn_id
             line = []
-            if self.display_usage:
+            if verbose:
                 line.append(f"T{turn_id + 1}: ")
             turn_title = f" Turn {turn_id + 1:02d} ".center(MENU_WIDTH, "=")
             print(f"\n{turn_title}")
@@ -121,7 +126,7 @@ class TerminalGui:
             for move in sorted_moves:
                 line.append(self.format_move(move))
             print(" ".join(line))
-            if self.display_usage:
+            if verbose:
                 self._display_zone_usage(turn_id)
                 self._display_conn_usage(turn_id)
             if self.manual:

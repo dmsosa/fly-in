@@ -18,6 +18,12 @@ from parser import FlyinParser
 from pathfinding.dijkstra import DijkstraPathfinding
 
 
+try:
+    from gui import FlyinPygameGui
+    PYGAME_GUI_AVAILABLE = True
+except ImportError:
+    PYGAME_GUI_AVAILABLE = False
+
 __author__ = "Durian Sosa"
 __email__ = "durisosa@student.42madrid.com"
 
@@ -96,6 +102,13 @@ def main() -> None:
         action="store_true",
         help="Enable colored visual terminal display and metrics",
     )
+    arg_parser.add_argument(
+        "-g",
+        "--gui",
+        default=True,
+        action=argparse.BooleanOptionalAction,
+        help="Enable pygame graphical user interface (--no-gui to skip)",
+    )
 
 
     args = arg_parser.parse_args()
@@ -106,7 +119,6 @@ def main() -> None:
     elif args.map_flag:
         map_file_arg = args.map_flag
 
-    verbose = args.verbose
     color_terminal = args.color
 
     is_ansi = should_use_ansi()
@@ -182,6 +194,22 @@ def main() -> None:
                 delay
                 )
             terminal_gui.print_history(history, orchestrator.reservation_table)
+            if args.gui:
+                if not PYGAME_GUI_AVAILABLE:
+                    print(
+                        f"❌ Error: \
+                        Pygame is not installed. " \
+                        "GUI can not run"
+                        )
+                    wait_for_enter("\n Choose another map...")
+                    continue
+                pygame_gui = FlyinPygameGui(
+                    graph=graph,
+                    drones=orchestrator.drones,
+                    reservations=orchestrator.reservation_table
+                )
+                pygame_gui.print_history(history=history)
+                    
         except FlyinUnreachableError as e:
             # Not a bug in the schedule: the map itself has no solution.
             # Report it and let the user pick another one.

@@ -21,11 +21,28 @@ THEME_CHAR = {
 THEME_COLOR = {
     "bg":      "#000000",
     "primary":    "#00d916",
-    "secondary": "#499A3E",
+    "secondary": "#2AB5B5",
     "tertiary":   "#B5A724",
     "danger":   "#ff0000",
-    "bg-secondary":     "#242424",
+    "bg-secondary":"#242424",
+    "connection-primary": "#6edc00",
+    "connection-secondary": "#dc8f00",
     "warning": "#fdbe00",
+    "info": "#66d19d",
+    "blue": "#0071a9",
+    "cyan": "#009ba9",
+    "orange": "#f47b18",
+    "black": "#151515",
+    "yellow": "#e7b614",
+    "red": "#c40000",
+    "green": "#21c400",
+    "purple": "#a9009e",
+    "maroon": "#AC4626",
+    "brown": "#662000",
+    "crimson": "#ac0000",
+    "darkred": "#5b0000",
+    "gold": "#dc8f00",
+
 }
 
 MENU_WIDTH = 30

@@ -554,3 +554,98 @@ and adapted before being kept.
   schedule for the shipped maps (and beats the challenger benchmark of 45 turns
   with 43), but it does not attempt to prove global optimality of the total turn
   count.
+
+
+# October 21.
+
+## Displayin into the temrinal with Pygame
+
+Pygame has a loop which runs, you always need to d pygme.init()  and is a god practice to do conditional imports handling FileIMport Error, and specify which packages are missing  into m project.
+
+since it has its own loops, my idea is that it can rint a history of movements and the while is going to run until the lastmovement is animated.
+
+how to animate a movement, I dont know, and I part rom the base that it  can be printed just by knowing the coordinates.
+
+Step 1: how to draw a graph.
+
+to draw a graph we need to convert the abstract x and y coordinates of each node to a coordinate into the display screen of pygame it tarts always from the top-left corner (that is the 0,0 coordinate off pygame screen) and I can center it to do OFFSET_X = WIDTH // 2 and same for the Y axis.
+
+But how to add a padding ?
+
+width - padding * 2
+
+and how big a zone is going to be ?
+
+Excellent article about animations and what are frames in game development:
+
+Games inherited this term from animation, film, and video.
+
+There, a "frame" is one still image in the sequence. By playing lots of frames in rapid succession, we create the illusion of motion.
+
+See this strip of 35 mm film from the Museum of Obsolete Media. In it, we can see three consecutive frames of a Spider-Man movie.
+
+3 frames of a film
+
+The framerate of a piece of animation/film/video is a measure of how quickly we move from one frame to another. Common values you'll see are 24, 30, or 60 frames per second - that's where the "FPS" abbreviation comes from. In an animation running at 24 fps, 24 different frames (pictures) are displayed for each one second of playback time.
+
+So, at a particular framerate, we can also think of one "frame" as a measure of time - say 1/24th of a second for a 24 fps animation.
+
+All of this carries over to games - the difference is that we typically have to create each image a fraction of a second before it's displayed, rather than just playing back an already-existing image sequence. That includes both the actual work of drawing, and the work to update the internal state of the game - like the positions of the characters - so that we know what to draw.
+
+In games we can say...
+
+A rendered frame is one complete image presented to the player's screen.
+
+By rendering and displaying new frames very quickly, games create the illusion of motion.
+
+The frame rate a game is running at is a measure of how many new frames it displays every second - so a 60 fps game is rendering and displaying 60 new images every second.
+
+A frame interval is the span of time between displaying two consecutive frames. For a game running at 60 fps, that's just over 16 milliseconds.
+
+You'll often hear game developers and players call this span of time "a frame" - like when a fighting game player says "this attack takes 5 frames to hit" what they mean is that 5 frame intervals pass between the time the player hits the attack button and when the attack actually does damage - leaving a potential window to interrupt or block the attack.
+
+We'll also sometimes loosely refer to all the work that the game has to do in order to prepare the next rendered frame as "a frame".
+
+So we do use this word to mean a few different but related things. Generally it's pretty clear what's intended based on the context.
+
+Let's dig into Unity's context to see how this applies.
+
+The Unity game engine has a sequence of steps it goes through for each rendered frame it presents to the player's screen. I'll simplify a little here, but you can find the full breakdown in the documentation.
+
+First, the engine reads the player's input since the last time it checked - things like keyboard key presses, mouse movements & clicks, gamepad buttons, sticks, and triggers, anything you can access via the Input class.
+
+Next, the engine ticks forward the game's physics simulation. This involves running all active scripts' FixedUpdate() methods, then integrating movements using the physics engine, then calling any collision-handling methods like OnCollisionEnter() or OnTriggerStay().
+
+It repeats this trio of operations as many times as it needs to for the game simulation to catch up to the current time (up to a limit). So if the game has been running slow and a lot of time has passed since the last physics step, it might have to loop these several times to catch up. But if the game has been running very fast, it can sometimes skip the physics step entirely, because not enough time has passed for a new one.
+
+Third, it calls all Update() methods on scripts.
+
+Fourth, it updates any animations that are currently playing and applies IK fix-ups.
+
+Then it runs any LateUpdate() methods on scripts, to do last-minute fix-ups that need to react to work that happened earlier in the frame interval.
+
+This could be things like moving a camera, label, or selection cursor that needs to exactly follow another game object that moves in Update() or via animation.
+
+Then it renders the scene, producing a new image - a new rendered frame.
+
+It publishes the new frame to the graphics device, to be presented to the player's screen.
+
+If VSync is enabled, the game waits until the next time the screen is ready for a new image before starting over at 1.
+
+Otherwise, it jumps right back to 1 and does it all again - possibly going faster than the screen can display images. This means that it draws some rendered frames that the player might never see in full - they might get skipped entirely, or get seen partially because they got sent to the screen halfway through a repaint, creating an artifact called "tearing".
+
+So, looking at all the work done during a frame interval, to produce one rendered frame, we can see that all of these statements are true:
+
+Update() is called every frame - Unity Document says
+
+Yes, the Update() method is called on every active script instance, for every frame interval, before drawing each rendered frame. Update() is never skipped (unlike FixedUpdate() for example).
+
+Update() is called during a frame - Some People Says
+
+Et rappelez-vouz: aujourd'hui on a trouve le systeme D pour se debrouiller! 
+# Resources
+
+## about fps and pygame basics
+https://gamedev.stackexchange.com/questions/174718/what-is-a-frame-and-frame-per-second
+
+https://stackoverflow.com/questions/79978006/how-to-make-two-structs-to-share-the-same-data-in-c/79978015#79978015

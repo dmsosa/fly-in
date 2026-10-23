@@ -12,6 +12,13 @@ from .constants import UX_MAX, \
     DELAY, \
     FAST_DELAY, \
     DIRECT
+from .pygame_gui import PYGAME_AVAILABLE
+
+# Importing the view without pygame installed must fail here (instead of
+# crashing later when the window is created), so ``main`` can fall back
+# to the terminal view only.
+if PYGAME_AVAILABLE:
+    from .pygame_gui import FlyinPygameGui  # noqa: F401
 
 
 __all__ = [
@@ -30,3 +37,6 @@ __all__ = [
     "FAST_DELAY",
     "DIRECT"
 ]
+
+if PYGAME_AVAILABLE:
+    __all__.append("FlyinPygameGui")
