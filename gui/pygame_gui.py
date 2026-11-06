@@ -1,8 +1,10 @@
 from dataclasses import dataclass
+import math
 import os
-from typing import Any
+from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field
 from gui.constants import THEME_COLOR
+from gui.game_loop import GameLoop, Replay, key_commands, poll_events
 from model import FlyinGraph
 from model.drone import Drone
 from orchestrator.orchestrator import Move
@@ -18,19 +20,19 @@ try:
 except ImportError:
     PYGAME_AVAILABLE = False
 
+
 FPS = 60
 HUD_HEIGHT = 80
 ZONE_RADIUS = 15
-DRONE_RADIUS = 4
+DRONE_RADIUS = 8
 ANIM_DURATION = 1.0
 
-@dataclass
-class DroneAnim:
-    zone: str                        # logical zone it is in / heading to
-    from_px: tuple[float, float]     # where the segment starts
-    to_px: tuple[float, float]       # where it ends
-    t0: float                        # turn-time the segment started
-    duration: float = ANIM_DURATION # turns
+
+@dataclass(frozen=True)
+class Segment:
+    turn_id: float
+    from_px: tuple[float, float]
+    to_px: tuple[float, float]
 
 
 class FlyinPygameGui(BaseModel):
@@ -41,7 +43,7 @@ class FlyinPygameGui(BaseModel):
 
     graph: FlyinGraph
     drones: dict[str, Drone]
-    reservations: ReservationTable
+    history: list[list[Move]]
     padding: int = Field(default=50)
     min_x: int = Field(default=1)
     max_x: int = Field(default=1)
@@ -51,6 +53,7 @@ class FlyinPygameGui(BaseModel):
     turns_per_second: float = Field(default=1.0, gt=0)
     drone_radius: int = Field(default=DRONE_RADIUS, ge=1)
     anim_duration: float = Field(default=ANIM_DURATION, gt=0)
+    fps: int = Field(default=FPS, ge=1)
     zone_radius: int = Field(default=ZONE_RADIUS, ge=1)
     hud_height: int = Field(default=HUD_HEIGHT, ge=1)
 
@@ -64,7 +67,7 @@ class FlyinPygameGui(BaseModel):
     offset_y: float = Field(default=0.0, exclude=True)
     window_w: int = Field(default=0, exclude=True)
     window_h: int = Field(default=0, exclude=True)
-    drone_anims: dict[str, DroneAnim] = Field(default_factory=dict, exclude=True)
+    timelines: dict[str, list[Segment]] = Field(default_factory=dict, exclude=True)
 
     def model_post_init(self, _context: Any) -> None:
         if not PYGAME_AVAILABLE:
@@ -74,6 +77,7 @@ class FlyinPygameGui(BaseModel):
                 )
 
         pygame.init()
+
         # Get desktop resolution BEFORE set_mode
         info = pygame.display.Info()
 
@@ -117,24 +121,12 @@ class FlyinPygameGui(BaseModel):
         self.offset_y = inset_y + (
             usable_h - range_y * self.scale) // 2
 
-        self._init_drone_animations()
+        self._build_timeline()
 
     def to_pixel(self, x: int, y: int) -> tuple[int, int]:
         px = self.offset_x + (x - self.min_x) * self.scale
         py = self.offset_y + (y - self.min_y) * self.scale
         return int(px), int(py)
-
-    def _init_drone_animations(self) -> None:
-        start_px = self.to_pixel(*self.graph.start_zone.coord)
-        self.drone_anims = {
-            drone_id: DroneAnim(
-                self.graph.start_zone.name,
-                start_px,
-                start_px,
-                0.0
-            )
-            for drone_id in self.drones
-        }
 
     def draw_graph(self) -> None:
         """Draws the connections and zones on the screen"""
@@ -170,17 +162,23 @@ class FlyinPygameGui(BaseModel):
                     color = pygame.Color(self.color_theme["secondary"])
             else:
                 color = pygame.Color(self.color_theme["secondary"])
+            capacity = zone.max_drones if zone.max_drones else math.inf
+            is_high_capacity = capacity > 3
+            if is_high_capacity:
+                radius = self.zone_radius
+            else:
+                radius = self.zone_radius + 3
             pygame.draw.circle(
                 self.screen,
                 pygame.Color(self.color_theme["tertiary"]),
                 (px, py),
-                radius=17
+                radius=radius
                 )
             pygame.draw.circle(
                 self.screen,
                 pygame.Color(color),
                 (px, py),
-                radius=15
+                radius=(radius - 2)
             )
 
     def draw_connection(
@@ -227,7 +225,86 @@ class FlyinPygameGui(BaseModel):
             i += segment_len
             drawing = not drawing
 
-    def print_history(self, history: list[list[Move]]) -> None:
+    def _find_slots(self, drone_to_zone: dict[str, str]) -> dict[str, tuple[int, int]]:
+        place_members: dict[str, list[str]] = {}
+        for drone_id, place_name in drone_to_zone.items():
+            place_members.setdefault(place_name, []).append(drone_id)
+
+        slots: dict[str, tuple[int, int]] = {}
+        for drones_in_place in place_members.values():
+            for idx, drone_id in enumerate(sorted(drones_in_place)):
+                slots[drone_id] = (idx, len(drones_in_place))
+        return slots
+    
+    def _zone_center(self, zone_name: str) -> tuple[float, float]:
+        zone = self.graph.get_zone_by_name(zone_name)
+        
+        x, y = zone.coord
+        px, py = self.to_pixel(
+            x,
+            y
+            )
+        
+        return (px, py)
+
+    def _offset_pixels(self, zone_name: str, slot: int, max_slot: int) -> tuple[float, float]:
+        if "-" in zone_name:                       # a link → point along the segment
+            name_a, name_b = zone_name.split("-", 1)
+            ax, ay = self._zone_center(name_a)
+            bx, by = self._zone_center(name_b)
+            f = (slot + 1) / (max_slot + 1)       # 1/2 alone, 1/3 & 2/3 for two
+            return ax + (bx - ax) * f, ay + (by - ay) * f
+
+        cx, cy = self._zone_center(zone_name)
+        if max_slot <= 1:                         # a lone drone sits in the middle
+            return cx, cy
+
+        ring = self.zone_radius - self.drone_radius // 2
+        angle = 2 * math.pi * slot / max_slot - math.pi / 2
+
+        return cx + ring * math.cos(angle), cy + ring * math.sin(angle)
+    
+    def _find_slot(self, zone_name: str, idx: int, max_idx: int) -> tuple[int, int]:
+        pass
+
+    def _build_timeline(self) -> None:
+        start = self.graph.start_zone.name
+        timelines: dict[str, list[Segment]]  = {
+            drone_id: [] for drone_id in self.drones.keys()
+        }
+
+        drone_to_zone = {drone_id: start for drone_id in self.drones.keys()}
+    
+        # each turn appends a new segment for each drone
+        for turn_id, turn in enumerate(self.history):
+            start_of_turn = dict(drone_to_zone) # snapshot
+
+            for move in turn:
+                # if this drone moved, append its objective to the goal
+                drone_that_moved = move.drone_id
+                drone_to_zone[drone_that_moved] = move.target_name
+
+            start_of_turn_slots = self._find_slots(start_of_turn)
+            end_of_turn_slots = self._find_slots(drone_to_zone)
+
+            for drone_id, timeline in timelines.items():
+                # Drone can end on the middle of a connection
+                # after having tried to access a restricted zone
+                origin_name = start_of_turn[drone_id]
+                dest_name = drone_to_zone[drone_id]
+
+                from_px = self._offset_pixels(origin_name, *start_of_turn_slots[drone_id])
+                to_px = self._offset_pixels(origin_name, *end_of_turn_slots[drone_id])
+                segment = Segment(
+                        turn_id=float(turn_id),
+                        from_px=from_px,
+                        to_px=to_px
+                        )
+                timeline.append(segment)
+                
+        self.timelines = timelines
+    
+    def draw_history(self) -> None:
         """
         simple loop
         The standard Pygame loop order is:
@@ -237,126 +314,62 @@ class FlyinPygameGui(BaseModel):
         Draw / render
         clock.tick(60)
         """
-        self._init_drone_animations()
         self.font = self._load_font()
         clock = pygame.time.Clock()
-        current_time = 0.0
-        turns_per_second = 1.0 / self.turns_per_second
-        current_turn = 0
-        end = float(len(history))
-        turn_count = len(history)
         pygame.font.init()
-        running = True
-        paused = False
-        while running:
-            dt = clock.tick(60) / 1000.0 # Seconds passed since last frame
+        keymap = key_commands()
+        loop = GameLoop(
+            end=float(len(self.history)),
+            turns_per_second=self.turns_per_second
+            )
+
+        while loop.running:
+            dt = clock.tick(self.fps) / 1000.0 # Seconds passed since last frame
             # current time determines actually in which turn we are placed on
-            if current_turn == turn_count:
-                running = False
-            if current_time < end:
-                if manual:
-                    self.
-                current_time = min(end, current_time + dt / turns_per_second)
+            loop.handle(poll_events(keymap))
+            loop.advance(dt)
             # Handling pygame events like key pressings
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_SPACE:
-                        current_time = 0.0
-                        current_turn = 0
-                        self._init_drone_animations()
-                    elif event.key == pygame.K_ESCAPE:
-                        running = False
-                    elif event.key == pygame.K_p:
-                        paused = not paused
-                    else:
-                        key = event.unicode
-                        if key in ("W", "left_arrow"):
-                            current_turn = max(0, current_turn - 2)
-                            current_time = max(0, current_time - 1)
-                        elif key in ("S", "right_arrow"):
-                            current_turn = min(turn_count, current_turn + 1)
-                            current_time = min(turn_count, current_time + 1)
-                        elif key in ("S", "right_arrow"):
-                            current_turn = min(turn_count, current_turn + 1)
-                            current_time = min(turn_count, current_time + 1)
-                        # qu'est que ce passe se on ne actualise pas les positions des animations?
-                        # ca que se passe, est que les px sont elles encore
-                        # turn count is 6, current time is 5.44
-                        # turn is 5, curent time is 4.44
-                        # le trn de cheque animation etancore
-                        # la meme,donc la progression serai toujours 1, au moins que
-                        # n a reduit le num de current_time suffisement pour simulair un  progres plus petit.
-                        # mais la position do origin et destination serant tojours la meme.
-                        # donc, c'est necessaire de reduir le current tunr pour le duble?
 
-            if not paused:
-                while current_turn < turn_count and current_time >= current_turn:
-                    self._update_anim_info(history, current_turn)
-                    current_turn += 1
+            if not loop.paused:
+                self._render(loop)
 
-                self.screen.fill(pygame.Color(self.color_theme["bg"]))
-                self.draw_graph()
 
-                for anim in self.drone_anims.values():
-                    px, py = self._get_drone_pixels(anim, current_time)
-                    # But the progress depend on how many seconds have passed
-                    self._draw_drone(px, py)
-
-                self._draw_hud(current_time, turn_count)
 
             pygame.display.flip()
 
         pygame.quit()
 
-    def _update_anim_info(
-            self,
-            history: list[list[Move]],
-            current_turn: int,
-            ) -> None:
-            turn = history[current_turn]
-            for move in turn:
-                anim = self.drone_anims.get(move.drone_id, None)
-                
-                if anim is None:
-                    continue
+    def _render(self, replay: Replay) -> None:
+        # if my current turn is , I need to iterate through each drone, in the segment number 0
+        self.screen.fill(pygame.Color(self.color_theme["bg"]))
+        self.draw_graph()
+        for drone_id in self.timelines.keys():
+            px, py = self._get_drone_pixels(replay.now, drone_id)
+            self._draw_drone(px, py)
 
-                anim.t0 = current_turn
-                target_name = move.target_name
-                if "-" in target_name:
-                    parts = target_name.split("-")
-                    origin, dest = parts
-                else:
-                    origin = anim.zone
-                    dest = target_name
-
-                origin_zone = self.graph.get_zone_by_name(origin)
-                dest_zone = self.graph.get_zone_by_name(dest)
-
-                anim.zone = dest_zone.name
-
-                px1, py1 = self.to_pixel(*origin_zone.coord)
-                px2, py2 = self.to_pixel(*dest_zone.coord)
-
-                anim.from_px = px1, py1
-                anim.to_px = (px2, py2)
+        self._draw_hud(replay.now, replay.end, replay.paused)
 
     def _get_drone_pixels(
             self,
-            anim: DroneAnim,
             current_time: float,
+            drone_id: str
             ) -> tuple[float, float]:
-            p = current_time - anim.t0 / (anim.t0 + 1 - anim.t0)
-            p = max(0.0, min(1.0, p))
+        timeline = self.timelines[drone_id]
+        turn = max(0, min(int(current_time), len(timeline) - 1))
 
-            x1, y1 = anim.from_px[0], anim.from_px[1]
-            x2, y2 = anim.to_px[0], anim.to_px[1]
+        seg = timeline[turn]
 
-            px = x1 + (x2 - x1) * p
-            py = y1 + (y2 - y1) * p
+        p = max(
+            0.0,
+            min(
+                1.0,
+                (current_time - seg.turn_id) / self.anim_duration
+                )
+            )
+        px = seg.from_px[0] + (seg.to_px[0] - seg.from_px[0]) * p
+        py = seg.from_px[1] + (seg.to_px[1] - seg.from_px[1]) * p
 
-            return px, py
+        return px, py
 
     def _draw_drone(
             self,
@@ -390,25 +403,26 @@ class FlyinPygameGui(BaseModel):
     def _draw_hud(
             self,
             now: float,
-            total_turns: int,
+            end_turn: float,
             paused: bool = True
     ) -> None:
         """Show the current turn and the controls at the bottom."""
         if self.font is None:
             return
 
-        turn = min(int(now) + 1, total_turns)
+        end_turn_int = int(end_turn)
+        turn = min(int(now) + 1, end_turn_int)
         hud_surface = pygame.Surface((500, 250))
         hud_surface.fill((0,0,255))
 
         label = self.font.render(
-            f"Turn {turn}/{total_turns}",
+            f"Turn {turn}/{end_turn_int}",
             True,
             pygame.Color(self.color_theme["primary"]),
         )
 
         paused_label = self.font.render(
-            f"PAUSED",
+            "PAUSED",
             True,
             pygame.Color(self.color_theme["primary"]),
         )
@@ -423,10 +437,10 @@ class FlyinPygameGui(BaseModel):
             "ESC to quit", True, pygame.Color("#ffffff"))
 
         y = self.window_h - HUD_HEIGHT + 16
-        self.screen.blit(hud_surface, (0, 0))
-        self.screen.blit(label, (self.offset_x + self.padding, y))
-        self.screen.blit(
+        hud_surface.blit(label, (self.offset_x + self.padding, y))
+        hud_surface.blit(
             hint, (self.window_w - hint.get_width() - self.padding, y))
+        self.screen.blit(hud_surface, (0, 0))
         if paused:
             self.screen.blit(paused_label, (self.window_w // 2, self.window_h // 2))
 #  mantenaint, cettee idee n'est pas complete parce il faut aussi actualise les donness de cheque animation

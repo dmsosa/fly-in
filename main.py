@@ -206,9 +206,9 @@ def main() -> None:
                 pygame_gui = FlyinPygameGui(
                     graph=graph,
                     drones=orchestrator.drones,
-                    reservations=orchestrator.reservation_table
+                    history=history
                 )
-                pygame_gui.print_history(history=history)
+                pygame_gui.draw_history()
                     
         except FlyinUnreachableError as e:
             # Not a bug in the schedule: the map itself has no solution.

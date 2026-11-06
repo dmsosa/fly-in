@@ -24,7 +24,7 @@ THEME_COLOR = {
     "secondary": "#2AB5B5",
     "tertiary":   "#B5A724",
     "danger":   "#ff0000",
-    "bg-secondary":"#242424",
+    "bg-secondary": "#242424",
     "connection-primary": "#6edc00",
     "connection-secondary": "#dc8f00",
     "warning": "#fdbe00",
