@@ -128,60 +128,37 @@ class FlyinPygameGui(BaseModel):
         py = self.offset_y + (y - self.min_y) * self.scale
         return int(px), int(py)
 
-    def draw_graph(self) -> None:
-        """Draws the connections and zones on the screen"""
-        for conn in self.graph.connections:
-            name_a, name_b = conn.get_zone_names()
-            zone_a = self.graph.get_zone_by_name(name_a)
-            zone_b = self.graph.get_zone_by_name(name_b)
-            x1, y1 = zone_a.coord
-            x2, y2 = zone_b.coord
-            p1 = self.to_pixel(x1, y1)
-            p2 = self.to_pixel(x2, y2)
-
-            is_high_capacity = conn.max_link_capacity > 1
-            if is_high_capacity:
-                color = self.color_theme["connection-primary"]
-            else:
-                color = self.color_theme["connection-secondary"]
-            self.draw_connection(
-                p1, p2,
-                color=pygame.Color(color),
-                thickness=min(5, max(1, conn.max_link_capacity)),
-                dashed=not is_high_capacity
-            )
-
-        for zone in self.graph.all_zones:
-            px, py = self.to_pixel(zone.coord[0], zone.coord[1])
-
-            if zone.color:
-                try:
-                    hex_code = self.color_theme.get(zone.color, self.color_theme["secondary"])
-                    color = pygame.Color(hex_code)
-                except ValueError:
-                    color = pygame.Color(self.color_theme["secondary"])
-            else:
+    def _draw_zone(self, zone) -> None:
+        """Draws the given zone on the screen"""
+        px, py = self.to_pixel(zone.coord[0], zone.coord[1])
+        if zone.color:
+            try:
+                hex_code = self.color_theme.get(zone.color, self.color_theme["secondary"])
+                color = pygame.Color(hex_code)
+            except ValueError:
                 color = pygame.Color(self.color_theme["secondary"])
-            capacity = zone.max_drones if zone.max_drones else math.inf
-            is_high_capacity = capacity > 3
-            if is_high_capacity:
-                radius = self.zone_radius
-            else:
-                radius = self.zone_radius + 3
-            pygame.draw.circle(
-                self.screen,
-                pygame.Color(self.color_theme["tertiary"]),
-                (px, py),
-                radius=radius
-                )
-            pygame.draw.circle(
-                self.screen,
-                pygame.Color(color),
-                (px, py),
-                radius=(radius - 2)
+        else:
+            color = pygame.Color(self.color_theme["secondary"])
+        capacity = zone.max_drones if zone.max_drones else math.inf
+        is_high_capacity = capacity > 3
+        if is_high_capacity:
+            radius = self.zone_radius + 5
+        else:
+            radius = self.zone_radius
+        pygame.draw.circle(
+            self.screen,
+            pygame.Color(self.color_theme["tertiary"]),
+            (px, py),
+            radius=radius
             )
+        pygame.draw.circle(
+            self.screen,
+            pygame.Color(color),
+            (px, py),
+            radius=(radius - 2)
+        )
 
-    def draw_connection(
+    def _draw_connection(
             self,
             origin: tuple[int, int],
             dest: tuple[int, int],
@@ -224,6 +201,18 @@ class FlyinPygameGui(BaseModel):
                 pygame.draw.line(self.screen, color, start, end, thickness)
             i += segment_len
             drawing = not drawing
+
+    def _draw_drones(self) -> None:
+        for id, drone in self.drones:
+            drone.
+
+    def _build_timelines(self) -> None:
+        """
+        Goal of this function: each drone has a timeline, a timeline is a list
+        of tuples, in which the first element is the turn number
+        and the second element is the zone that drone was placed on.
+        """
+        
 
     def _find_slots(self, drone_to_zone: dict[str, str]) -> dict[str, tuple[int, int]]:
         place_members: dict[str, list[str]] = {}
@@ -326,9 +315,9 @@ class FlyinPygameGui(BaseModel):
         while loop.running:
             dt = clock.tick(self.fps) / 1000.0 # Seconds passed since last frame
             # current time determines actually in which turn we are placed on
+            # Handling pygame events like key pressings
             loop.handle(poll_events(keymap))
             loop.advance(dt)
-            # Handling pygame events like key pressings
 
             if not loop.paused:
                 self._render(loop)
@@ -339,10 +328,36 @@ class FlyinPygameGui(BaseModel):
 
         pygame.quit()
 
+    def _render_graph(self) -> None:
+        """Draws the connections and zones on the screen"""
+        for conn in self.graph.connections:
+            name_a, name_b = conn.get_zone_names()
+            zone_a = self.graph.get_zone_by_name(name_a)
+            zone_b = self.graph.get_zone_by_name(name_b)
+            x1, y1 = zone_a.coord
+            x2, y2 = zone_b.coord
+            coord_pixels1 = self.to_pixel(x1, y1)
+            coord_pixels2 = self.to_pixel(x2, y2)
+
+            is_high_capacity = conn.max_link_capacity > 1
+            if is_high_capacity:
+                color = self.color_theme["connection-primary"]
+            else:
+                color = self.color_theme["connection-secondary"]
+            self._draw_connection(
+                coord_pixels1, coord_pixels2,
+                color=pygame.Color(color),
+                thickness=min(5, max(1, conn.max_link_capacity)),
+                dashed=not is_high_capacity
+            )
+
+        for zone in self.graph.zones:
+            self._draw_zone(zone)
+
     def _render(self, replay: Replay) -> None:
         # if my current turn is , I need to iterate through each drone, in the segment number 0
         self.screen.fill(pygame.Color(self.color_theme["bg"]))
-        self.draw_graph()
+        self._render_graph()
         for drone_id in self.timelines.keys():
             px, py = self._get_drone_pixels(replay.now, drone_id)
             self._draw_drone(px, py)
