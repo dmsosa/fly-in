@@ -1,8 +1,0 @@
-Traceback (most recent call last):
-  File "/home/durisosa/work/repos-official/flying/main.py", line 30, in parse_and_init_graph
-    graph_data = parser.parse(config_file)
-  File "/home/durisosa/work/repos-official/flying/parser/parser.py", line 92, in parse
-    zone_data = ZoneParser.parse(data)
-  File "/home/durisosa/work/repos-official/flying/parser/zone_parser.py", line 64, in parse
-    raise ZoneParseError(f"Metadata key for zone '{meta_key}' not recognized.")
-parser.zone_parser.ZoneParseError: Metadata key for zone 'coldasor' not recognized.
