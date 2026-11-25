@@ -85,14 +85,15 @@ class TerminalGui:
             color_a = zone_a.color if zone_a else None
             color_b = zone_b.color if zone_b else None
 
+            result: str = ""
             if self.color_terminal:
-                result: str = (
+                result = (
                     f"{move.drone_id}-"
                     f"{self.colorize(target_a, color_a, bold=True)}"
                     f"-{self.colorize(target_b, color_b, bold=True)}"
                 )
             else:
-                result: str = (
+                result = (
                     f"{move.drone_id}-"
                     f"{target_a}"
                     f"-{target_b}"
@@ -126,76 +127,8 @@ class TerminalGui:
             for move in sorted_moves:
                 line.append(self.format_move(move))
             print(" ".join(line))
-            if verbose:
-                self._display_zone_usage(turn_id)
-                self._display_conn_usage(turn_id)
             if self.manual:
                 wait_for_enter("\n")
             if not self.direct and not self.manual:
                 sleep(self.delay)
         print("\n\n\n")
-
-    def _display_zone_usage(self, turn_id: int) -> None:
-        zone_usage_title = (
-            f" Zone usage {turn_id + 1} ".center(MENU_WIDTH, "*")
-            )
-        print(f"\n{zone_usage_title}")
-        zone_usage_line = []
-        for zone in self.graph.all_zones:
-            zone_usage = self.reservation.zone_occupancy.get(
-                    (zone.name, turn_id),
-                    0
-                )
-            if zone_usage == 0:
-                continue
-            if self.color_terminal:
-                name_styled = self.colorize(
-                    f"Zone: {zone.name:<12}",
-                    zone.color,
-                    False
-                    )
-            else:
-                name_styled = f"Zone: {zone.name:<12}"
-            type_styled = f"({zone.type.value})"
-            zone_max_str = (
-                "inf" if zone.is_unlimited_capacity()
-                else str(zone.max_drones)
-            )
-            zone_str = (
-                f" - {name_styled} \
-                {type_styled:<14} \
-                {zone_usage:>2}/{zone_max_str:<3}"
-            )
-            zone_usage_line.append(zone_str)
-        print("\n".join(zone_usage_line))
-
-    def _display_conn_usage(self, turn_id: int) -> None:
-        title = f" Connection usage {turn_id + 1} ".center(MENU_WIDTH, "+")
-        print(f"\n{title}")
-        conn_usage_line = []
-        for conn in self.graph.connections:
-            name_a, name_b = conn.key
-            conn_usage = self.reservation.link_occupancy.get(
-                ((name_a, name_b), turn_id),
-                0)
-            if conn_usage == 0:
-                continue
-            if self.color_terminal:
-                zone_a = self.graph.get_zone_by_name(name_a)
-                zone_b = self.graph.get_zone_by_name(name_b)
-                color_a = zone_a.color if zone_a else "white"
-                color_b = zone_b.color if zone_b else "white"
-                name_styled = (
-                    "Connection: "
-                    + self.colorize(f"{name_a}", color_a, False)
-                    + "-"
-                    + self.colorize(f"{name_b}", color_b, False)
-                )
-            else:
-                name_styled = f"- Connection: {name_a}-{name_b}"
-            conn_max = conn.max_link_capacity
-            conn_str = (
-                f" - {name_styled} ({conn_usage}/{conn_max})"
-            )
-            conn_usage_line.append(conn_str)
-        print("\n".join(conn_usage_line))

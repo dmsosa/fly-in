@@ -9,7 +9,7 @@ WHITE := \033[97m
 
 PROJECT := Fly-in
 NAME    := main.py
-MAP     ?= maps/hard/02_capacity_hell.txt
+MAP     ?= 
 ARGS    ?=
 
 .PHONY: install install-req run debug test clean lint lint-strict help

@@ -15,9 +15,9 @@ class ReservationTable:
     * ``connection.drone_count`` counts drones currently crossing a
       restricted link (they hold the link for the two turns of the
       crossing);
-    * ``_link_hops`` counts *instantaneous* normal hops made during a
+    * ``link_occupancy`` counts *instantaneous* normal hops made during a
       single turn, because a normal move finishes in the same turn and
-      would otherwise leave no trace behind.
+      would otherwise leave no trace behind;
 
     ``zone_occupancy`` and ``link_occupancy`` are per-turn *snapshots*
     produced by :meth:`record_turn`. They are what the terminal GUI reads
@@ -29,6 +29,9 @@ class ReservationTable:
         """Initialize the per-turn occupancy ledgers."""
         self.zone_occupancy: dict[tuple[str, int], int] = {}
         self.link_occupancy: dict[tuple[tuple[str, str], int], int] = {}
+        # Transient hops are kept separate from the GUI snapshot: a normal
+        # hop only exists during its own turn and must not be mistaken for
+        # a drone still crossing a restricted link.
         self._link_hops: dict[tuple[tuple[str, str], int], int] = {}
 
     def is_zone_available(
@@ -45,8 +48,12 @@ class ReservationTable:
             is_start_or_end: True for the start/end hubs, whose capacity
                 is unbounded.
         """
-        if is_start_or_end or zone.is_unlimited_capacity():
+        if is_start_or_end or zone.is_unlimited_capacity() \
+                or not zone.max_drones:
             return True
+        # Zone slots are persistent: a drone that stays put keeps its slot
+        # on every later turn, so availability follows the live counter and
+        # not the per-turn snapshot used by the GUI.
         return zone.drone_count < cast(int, zone.max_drones)
 
     def is_link_available(self, conn: Connection, turn: int) -> bool:

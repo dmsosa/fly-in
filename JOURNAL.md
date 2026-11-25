@@ -62,13 +62,13 @@ rules seem to be, handle events, update the game, for updating the game I need t
 ## Episode 4: No 6. 2026
 
 Comment monstrer le progres d'une drone dans une zone a l'autre?
-Le drone doit avoir une coord_pixel d'origine et une coord_pixel d'finalisation, donc, il faut les calculer avec la zone de origin dans ce turn, et le zone d'origine du movement porchain.
+Le drone doit avoir une coord_pixel d'origine et une coord_pixel d'finalisation, donc, il faut les calculer avec la zone de destination dans ce turn, et le zone d'destination du movement anterieur.
 
 Qu'est ce que c'est le history?
 Le history et un 2D array de Move objects, les Move objects on la information suivant:
 
 - drone_id
-- current_zone
+- target_name (peut etret une zone_name, ou connection name zone_a, zone_b)
 - turn_id
 
 Pour les drones que s'ont deplace on ce turn, on doit actualiser sa information pour le turn prochaine. 

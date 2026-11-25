@@ -7,10 +7,11 @@ from error import FlyinParseError
 
 class FlyinParser:
     """
-    Parser is going to build a dictionary without caring about the actual values
-    and pass them to the corresponding Pydantic Models for more complex validation
-    once a Zone is sucessfully created, you can pass the entire dictionary to the
-    parent pydantic model "Graph"
+    Parser is going to build a dictionary without
+    caring about the actual values and pass them to the
+    corresponding Pydantic Models for more complex validation
+    once a Zone is sucessfully created, you can pass the
+    entire dictionary to the parent pydantic model "Graph"
 
     Graph of zones (vertices) and connections (edges).
     fields:
@@ -19,9 +20,10 @@ class FlyinParser:
     end_zone # goal zone for all drones
     zones # all zones in a set
     connections # all connections in a set
-    """
 
-    """Holds the level, file name and final path of the map to load."""
+    Holds the level, file name and final path of
+    the map to load.
+    """
     def __init__(self) -> None:
         """Start with nothing selected."""
         pass
@@ -35,11 +37,12 @@ class FlyinParser:
 
     def parse(self, file_path: str | Path) -> dict[str, Any]:
         """
-        This function receives the file_path after the user interacted with the menu
+        This function receives the file_path
+        after the user interacted with the menu
         then reads the file and builds the flyin graph.
 
         Handles all file-related exceptions
-        """        
+        """
         with open(file_path, 'r') as f:
             filename = Path(file_path).stem
             print(f"Trying to read the map file: {filename}...")
@@ -49,7 +52,7 @@ class FlyinParser:
                 raise FlyinParseError("Config file is empty")
             print("File open successful: OK.")
 
-        result_dict = {
+        result_dict: dict[str, Any] = {
             "filename": filename,
             "drone_count": None,
             "start_zone": None,
@@ -60,26 +63,36 @@ class FlyinParser:
 
         first_line_nb_drones = False
 
-        for row, l in enumerate(lines):
-            l = l.strip()
+        for i, line in enumerate(lines):
+            line = line.strip()
 
-            if not l or l.startswith("#"):
+            if not line or line.startswith("#"):
                 continue
 
-            parts = l.split(":", 1)
+            parts = line.split(":", 1)
 
             if len(parts) != 2:
-                raise FlyinParseError(f"Bad key:value format received: Line {row + 1}")
+                raise FlyinParseError(
+                    "Bad key:value format received: "
+                    f"Line {i + 1}"
+                    )
 
             key, data = parts
             key = key.strip().lower()
             data = data.strip()
 
             if not first_line_nb_drones and key != "nb_drones":
-                raise FlyinParseError(f"The first line must define the number of drones using nb_drones: <number>.")
-            
+                raise FlyinParseError(
+                    "The first line must "
+                    "define the number of drones "
+                    "using nb_drones: <number>."
+                    )
+
             if not self._valid_key(key):
-                raise FlyinParseError(f"Key for parser not recognized: '{key}'. [Line: {row + 1}]")
+                raise FlyinParseError(
+                    f"Key for parser not recognized: '{key}'."
+                    f"[Line: {i + 1}]"
+                    )
 
             if key == "hub":
                 zone_data = ZoneParser.parse(data)
@@ -88,8 +101,8 @@ class FlyinParser:
             elif key == "start_hub":
                 if result_dict["start_zone"] is not None:
                     raise FlyinParseError(
-                        f"There must be exactly one start_hub. \
-                        [Line: {row + 1}]"
+                        f"There must be exactly one start_hub. "
+                        f"[Line: {i + 1}]"
                         )
                 zone_data = ZoneParser.parse(data)
                 zone_data["hub_type"] = "start"
@@ -98,8 +111,8 @@ class FlyinParser:
             elif key == "end_hub":
                 if result_dict["end_zone"] is not None:
                     raise FlyinParseError(
-                        f"There must be exactly one end_hub. \
-                        [Line: {row + 1}]"
+                        f"There must be exactly one end_hub. "
+                        f"[Line: {i + 1}]"
                         )
                 zone_data = ZoneParser.parse(data)
                 zone_data["hub_type"] = "end"
@@ -116,7 +129,7 @@ class FlyinParser:
                             defined more than once.\n" \
                         f"   └── first value was: \
                             {result_dict['drone_count']}" \
-                        f"   └── [Line {row + 1}]" \
+                        f"   └── [Line {i + 1}]" \
                         ""
                     raise FlyinParseError(msg)
                 try:
@@ -126,7 +139,7 @@ class FlyinParser:
                 except ValueError:
                     raise FlyinParseError(
                         f"Invalid value for drone count: \
-                        '{data}'. [Line {row + 1}]"
+                        '{data}'. [Line {i + 1}]"
                         )
 
         if not result_dict["start_zone"]:

@@ -25,10 +25,8 @@ import pygame  # noqa: E402
 from gui.pygame_gui import (  # noqa: E402
     HUD_CONTROLS,
     FlyinPygameGui,
-    hud_status,
-    point_on_segment,
 )
-from gui.game_loop import Command, Replay  # noqa: E402
+from gui.game_loop import Command, GameLoop as Replay  # noqa: E402
 from model.graph import FlyinGraph  # noqa: E402
 from orchestrator.orchestrator import Move  # noqa: E402
 from tests.helpers import make_drone, make_graph  # noqa: E402
@@ -110,7 +108,9 @@ def make_gui(
         drone_id: make_drone(graph, graph.start_zone.name, drone_id)
         for drone_id in drone_ids
     }
-    return FlyinPygameGui(graph=graph, drones=drones, history=history)
+    gui = FlyinPygameGui(graph=graph, drones=drones, history=history)
+    gui._build_timelines()
+    return gui
 
 
 def zone_px(gui: FlyinPygameGui, zone_name: str) -> tuple[float, float]:
@@ -272,7 +272,7 @@ def test_two_drones_on_the_same_link() -> None:
 def test_build_timeline_is_idempotent() -> None:
     gui = make_gui()
     first = {d: list(t) for d, t in gui.timelines.items()}
-    gui._build_timeline()
+    gui._build_timelines()
     for drone_id, timeline in gui.timelines.items():
         assert timeline == first[drone_id], (
             f"{drone_id}: rebuilding changed the timeline"
@@ -302,13 +302,13 @@ def test_timeline_turn_ids_match_their_index() -> None:
 def test_lone_drone_is_centered_in_a_zone() -> None:
     gui = make_gui()
     center = zone_px(gui, "start")
-    assert_close(gui._offset_pixels("start", 0, 1), center)
+    assert_close(gui._offset_pixels("start", (0, 1)), center)
 
 
 def test_zone_slots_are_distinct_and_inside_the_hub() -> None:
     gui = make_gui()
     center = zone_px(gui, "start")
-    points = [gui._offset_pixels("start", slot, 4) for slot in range(4)]
+    points = [gui._offset_pixels("start", (slot, 4)) for slot in range(4)]
 
     assert len(set(points)) == 4, f"slots overlap: {points}"
     for point in points:
@@ -322,12 +322,12 @@ def test_link_midpoint_for_a_lone_drone() -> None:
     midpoint = ((start[0] + restricted[0]) / 2,
                 (start[1] + restricted[1]) / 2)
 
-    assert_close(gui._offset_pixels("start-r", 0, 1), midpoint)
+    assert_close(gui._offset_pixels("start-r", (0, 1)), midpoint)
 
 
 def test_link_slots_are_ordered() -> None:
     gui = make_gui(graph=restricted_graph(), history=[], drone_ids=("D1",))
-    points = [gui._offset_pixels("start-r", slot, 3) for slot in range(3)]
+    points = [gui._offset_pixels("start-r", (slot, 3)) for slot in range(3)]
     assert points[0][0] < points[1][0] < points[2][0]
 
 
@@ -338,47 +338,8 @@ def test_link_point_stays_between_the_endpoints() -> None:
     restricted = zone_px(gui, "r")
 
     for slot in range(3):
-        point = gui._offset_pixels("start-r", slot, 3)
+        point = gui._offset_pixels("start-r", (slot, 3))
         assert_between(point, start, restricted)
-
-
-def test_point_on_segment_keeps_the_margin() -> None:
-    first = point_on_segment((0, 0), (100, 0), 0, 2, margin=0.2)
-    second = point_on_segment((0, 0), (100, 0), 1, 2, margin=0.2)
-    assert_close(first, (40.0, 0.0))
-    assert_close(second, (60.0, 0.0))
-
-
-def test_drone_radius_shrinks_when_crowded() -> None:
-    gui = make_gui()
-    assert gui._drone_radius(1) == gui.drone_radius
-
-    radii = [gui._drone_radius(n) for n in (2, 4, 10, 25)]
-    assert all(a >= b for a, b in zip(radii, radii[1:])), radii
-    assert radii[-1] < gui.drone_radius
-    assert radii[-1] >= 2.0
-
-
-def test_segment_carries_slot_counts() -> None:
-    """The renderer needs the crowding of both endpoints."""
-    gui = make_gui()
-    first = gui.timelines["D1"][0]
-    assert (first.from_count, first.to_count) == (2, 1)
-
-
-def test_point_on_segment_clamps_slot_and_margin() -> None:
-    origin, dest = (0.0, 0.0), (100.0, 0.0)
-    assert_close(
-        point_on_segment(origin, dest, -5, 3),
-        point_on_segment(origin, dest, 0, 3),
-    )
-    assert_close(
-        point_on_segment(origin, dest, 99, 3),
-        point_on_segment(origin, dest, 2, 3),
-    )
-    # An absurd margin is clamped, but the point never leaves the segment.
-    point = point_on_segment(origin, dest, 1, 2, margin=10.0)
-    assert 0.0 <= point[0] <= 100.0
 
 
 # -------------------------------------------------------- interpolation
@@ -479,18 +440,46 @@ def test_replay_advance_is_clamped_to_end() -> None:
     assert replay.now == 1.0
 
 
+def test_replay_skip_jumps_to_the_end_and_pauses() -> None:
+    replay = Replay(end=10.0)
+    replay.now = 3.0
+    replay.handle([Command.SKIP])
+    assert replay.now == 10.0
+    assert replay.paused
+
+
 # --------------------------------------------------------------- HUD
 
-def test_hud_status_labels() -> None:
-    assert hud_status(0.0, 10, False) == ("Turn 1/10", "PLAYING")
-    assert hud_status(3.2, 10, True) == ("Turn 4/10", "PAUSED")
-    assert hud_status(10.0, 10, False) == ("Turn 10/10", "PLAYING")
-    assert hud_status(0.0, 0, False) == ("Turn 0/0", "PLAYING")
+def test_hud_controls_list_the_menu_options() -> None:
+    labels = [label for _, label, _ in HUD_CONTROLS]
+    assert labels == [
+        "Next step",
+        "Previous step",
+        "Play/Pause",
+        "Skip",
+        "Exit",
+    ]
 
 
-def test_hud_controls_list_pause_next_previous() -> None:
-    actions = {action for _, action in HUD_CONTROLS}
-    assert {"Pause", "Next", "Previous"} <= actions
+def test_hud_buttons_are_clickable_and_do_not_overlap() -> None:
+    gui = make_gui()
+    gui.font = gui._load_font()
+    gui._draw_hud(0.0, float(len(HISTORY)), False)
+
+    assert len(gui.hud_buttons) == len(HUD_CONTROLS), (
+        f"only {len(gui.hud_buttons)} of {len(HUD_CONTROLS)} buttons fit"
+    )
+
+    rects = [rect for rect, _ in gui.hud_buttons]
+    for rect in rects:
+        assert rect.left >= gui.padding
+        assert rect.right <= gui.window_w - gui.padding
+    for first, second in zip(rects, rects[1:]):
+        assert first.right <= second.left, f"{first} overlaps {second}"
+
+    for rect, command in gui.hud_buttons:
+        assert gui._command_at(rect.center) is command
+    assert gui._command_at((0, 0)) is None
 
 
 def test_hud_draws_bottom_bar_and_leaves_the_graph() -> None:
@@ -537,7 +526,7 @@ def test_draw_graph_handles_unlimited_capacity_hubs() -> None:
         drone_ids=("D1",),
     )
     gui.font = gui._load_font()
-    gui.draw_graph()
+    gui._render_graph()
 
 
 # ---------------------------------------------------------- frame loop

@@ -24,7 +24,7 @@ def hex_to_ansi_bg(hex_color: str) -> str:
 
 
 class FlyinPrinter:
-    def __init__(self):
+    def __init__(self) -> None:
         self.is_ansi: bool = False
         self.prettify: bool = False
         self.delay: float = 0.03
@@ -96,7 +96,7 @@ class FlyinPrinter:
 
     def print_goodbye(self) -> None:
         """Exits the application gracefully displaying parting graphics."""
-        self.clear_screen()
+        clear_screen()
         print("\n\n")
         if self.is_ansi:
             accent = hex_to_ansi_fg(THEME_COLOR["primary"])
@@ -104,8 +104,8 @@ class FlyinPrinter:
         else:
             accent = ""
             reset = ""
-        self.print_wrap(f"{accent}{self.title()}{reset}", end="\n" * 3)
-        self.print_wrap("Thanks for using the fly-in project, :)", "\n")
+        self.print_wrap(f"{accent}{self.title()}{reset}\n\n\n")
+        self.print_wrap("Thanks for using the fly-in project, :)\n")
         sys.exit(0)
 
     def print_lines(
@@ -115,9 +115,9 @@ class FlyinPrinter:
             scale: int = 3
             ) -> None:
         if self.is_ansi:
-            self._print_menu_ansi(title, items, scale)
+            self._print_lines_ansi(title, items, scale)
         else:
-            self._print_menu_ascii(title, items, scale)
+            self._print_lines_ascii(title, items, scale)
 
     def _print_lines_ascii(
             self,

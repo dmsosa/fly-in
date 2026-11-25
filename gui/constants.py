@@ -18,17 +18,19 @@ THEME_CHAR = {
     0b1010: "═",
 }
 
+
 THEME_COLOR = {
-    "bg":      "#000000",
-    "primary":    "#00d916",
+    "bg": "#000000",
+    "primary": "#00d916",
     "secondary": "#2AB5B5",
-    "tertiary":   "#B5A724",
-    "danger":   "#ff0000",
+    "tertiary": "#B5A724",
+    "danger": "#ff0000",
     "bg-secondary": "#242424",
     "connection-primary": "#6edc00",
     "connection-secondary": "#dc8f00",
     "warning": "#fdbe00",
     "info": "#66d19d",
+    "drone": "#cfcfcf",
     "blue": "#0071a9",
     "cyan": "#009ba9",
     "orange": "#f47b18",
@@ -38,6 +40,7 @@ THEME_COLOR = {
     "green": "#21c400",
     "purple": "#a9009e",
     "maroon": "#AC4626",
+    "white": "#EEEEEE",
     "brown": "#662000",
     "crimson": "#ac0000",
     "darkred": "#5b0000",
@@ -53,6 +56,7 @@ RESET = "\033[0m"
 HIDE_CURSOR = "\033[?25l"
 SHOW_CURSOR = "\033[?25h"
 
+
 # Regular colors (bright)
 BLACK = "\033[30m"
 RED = "\033[31m"
@@ -63,6 +67,7 @@ MAGENTA = "\033[35m"
 CYAN = "\033[36m"
 WHITE = "\033[37m"
 
+
 # Bold / bright variants
 BOLD_BLACK = "\033[90m"
 BOLD_RED = "\033[91m"
@@ -72,6 +77,7 @@ BOLD_BLUE = "\033[94m"
 BOLD_MAGENTA = "\033[95m"
 BOLD_CYAN = "\033[96m"
 BOLD_WHITE = "\033[97m"
+
 
 COLOR_MAP = {
     "green": "\033[32m",
@@ -92,6 +98,7 @@ COLOR_MAP = {
     "lime": "\033[38;5;118m",
     "black": "\033[30m",
 }
+
 
 # Text styles
 BOLD = "\033[1m"

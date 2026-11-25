@@ -86,3 +86,4 @@ def read_boolean_key() -> bool:
             break
         move_cursor_up(3)
     print("Cancelled the select boolean operation")
+    return False

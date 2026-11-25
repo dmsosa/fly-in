@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 import math
+from typing import Callable
 
 
 try:
@@ -16,6 +17,7 @@ class Command(str, Enum):
     RESET = "reset"
     NEXT = "next"
     PREVIOUS = "previous"
+    SKIP = "skip"
 
 
 @dataclass
@@ -40,6 +42,9 @@ class GameLoop:
             elif command == Command.PREVIOUS:
                 self.now = max(0.0, math.ceil(self.now) - 1)
                 self.paused = True
+            elif command == Command.SKIP:
+                self.now = self.end
+                self.paused = True
 
     def advance(self, dt: float) -> None:
         if not self.paused:
@@ -56,11 +61,22 @@ def key_commands() -> dict[int, Command]:
         pygame.K_w: Command.PREVIOUS,
         pygame.K_RIGHT: Command.NEXT,
         pygame.K_s: Command.NEXT,
+        pygame.K_END: Command.SKIP,
+        pygame.K_f: Command.SKIP,
         pygame.K_r: Command.RESET,
     }
 
 
-def poll_events(keymap: dict[int, Command]) -> list[Command]:
+def poll_events(
+    keymap: dict[int, Command],
+    click_command: Callable[[tuple[int, int]], Command | None] | None = None,
+) -> list[Command]:
+    """Translate keyboard (and optional mouse) input into commands.
+
+    ``click_command`` receives the mouse position and returns the command
+    for the HUD button under it (or ``None``). Keeping the hit test in the
+    GUI keeps this module free of layout knowledge.
+    """
     commands: list[Command] = []
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -69,4 +85,9 @@ def poll_events(keymap: dict[int, Command]) -> list[Command]:
             command = keymap.get(event.key)
             if command is not None:
                 commands.append(command)
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if click_command is not None:
+                command = click_command(event.pos)
+                if command is not None:
+                    commands.append(command)
     return commands

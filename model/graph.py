@@ -35,7 +35,7 @@ class Zone(BaseModel):
     hub_type: HubType = Field(default=HubType.HUB)
     max_drones: Optional[int] = Field(default=1, gt=0)
     drone_count: int = Field(default=0, ge=0)
-    static_cost: int = Field(default=1)
+    static_cost: float = Field(default=1, ge=0.0)
     connections: list[Any] = Field(default_factory=list)
     drones_by_id: list[str] = Field(default_factory=list)
 
@@ -126,7 +126,8 @@ class Connection(BaseModel):
     @property
     def key(self) -> tuple[str, str]:
         """Canonical (sorted) pair — (B,A) and (A,B) both → (A,B)."""
-        return tuple(sorted((self.zone_a, self.zone_b)))
+        a, b = self.zone_a, self.zone_b
+        return (a, b) if a <= b else (b, a)
 
     def get_opposite(self, zone_name: str) -> str:
         if zone_name == self.zone_a:
@@ -162,7 +163,7 @@ class FlyinGraph(BaseModel):
     all_zones: list[Zone] = Field(default_factory=list)
     adjacency_list: dict[
         str,
-        list[tuple[str, int]]
+        list[tuple[str, float]]
         ] = Field(default_factory=dict)
 
     # Model validation after -------------------------------------
@@ -213,18 +214,19 @@ class FlyinGraph(BaseModel):
             found = False
             for i in range(0, all_zones_len):
                 zone_i = self.all_zones[i]
-                first_dup = zone_i.coord
+                first_dup_coord = zone_i.coord
                 for j in range(i + 1, all_zones_len):
                     zone_j = self.all_zones[j]
-                    second_dup = zone_j.coord
-                    if first_dup == second_dup:
+                    second_dup_coord = zone_j.coord
+                    if first_dup_coord == second_dup_coord:
                         found = True
                         break
                 if found:
                     break
             raise PydanticCustomError(
                 "duplicate_zone_coords",
-                f"Duplicated zone coordinates {first_dup} - {second_dup}"
+                f"Duplicated zone coordinates "
+                f"{first_dup_coord} - {second_dup_coord}"
             )
 
         unique_connections = set()
@@ -278,10 +280,12 @@ class FlyinGraph(BaseModel):
             self._zones_by_name[conn.zone_b].connections.append(conn)
 
     def _build_adjacency_list(self) -> None:
-        adj_lst = {}
+        adj_lst: dict[str, list[tuple[str, float]]] = {}
         for conn in self.connections:
             zone_a = self.get_zone_by_name(conn.zone_a)
             zone_b = self.get_zone_by_name(conn.zone_b)
+            if not zone_a or not zone_b:
+                raise ValueError(f"Invalid connection: {conn.key}")
             if zone_a.name not in adj_lst:
                 adj_lst[zone_a.name] = []
             if zone_b.name not in adj_lst:
@@ -297,7 +301,8 @@ class FlyinGraph(BaseModel):
         return self._zones_by_name.get(name)
 
     def get_connection(self, zone_a: str, zone_b: str) -> Connection:
-        conn = self._conn_index.get(tuple(sorted((zone_a, zone_b))))
+        key = (zone_a, zone_b) if zone_a <= zone_b else (zone_b, zone_a)
+        conn = self._conn_index.get(key)
         if conn is None:
             raise PydanticCustomError(
                 "connection_not_found",
@@ -318,12 +323,19 @@ class FlyinGraph(BaseModel):
         """
         neighbors = []
         for connection in self.connections:
+            # ``connection.key`` is sorted for indexing only: it does NOT
+            # preserve which end is zone_a/zone_b. Comparing it to a zone
+            # name picks the wrong side of reversed links (starts at the
+            # later alphabetically), which makes the graph look disconnected.
             if connection.zone_a == zone_name:
-                neighbor = self.get_zone_by_name(connection.zone_b)
-                if neighbor.type != ZoneType.BLOCKED:
-                    neighbors.append(neighbor)
+                neighbour_name = connection.zone_b
             elif connection.zone_b == zone_name:
-                neighbor = self.get_zone_by_name(connection.zone_a)
-                if neighbor.type != ZoneType.BLOCKED:
-                    neighbors.append(neighbor)
+                neighbour_name = connection.zone_a
+            else:
+                continue
+
+            neighbor = self.get_zone_by_name(neighbour_name)
+            if neighbor is None or neighbor.type == ZoneType.BLOCKED:
+                continue
+            neighbors.append(neighbor)
         return neighbors

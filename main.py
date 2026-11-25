@@ -110,7 +110,6 @@ def main() -> None:
         help="Enable pygame graphical user interface (--no-gui to skip)",
     )
 
-
     args = arg_parser.parse_args()
 
     map_file_arg = None
@@ -197,8 +196,8 @@ def main() -> None:
             if args.gui:
                 if not PYGAME_GUI_AVAILABLE:
                     print(
-                        f"❌ Error: \
-                        Pygame is not installed. " \
+                        "❌ Error: "
+                        "Pygame is not installed. "
                         "GUI can not run"
                         )
                     wait_for_enter("\n Choose another map...")
@@ -209,7 +208,7 @@ def main() -> None:
                     history=history
                 )
                 pygame_gui.draw_history()
-                    
+
         except FlyinUnreachableError as e:
             # Not a bug in the schedule: the map itself has no solution.
             # Report it and let the user pick another one.

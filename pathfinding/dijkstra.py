@@ -45,7 +45,10 @@ class DijkstraPathfinding:
         return dmap
 
     # ---- find all the paths, regardless of if it is the shortest or not ----
-    def find_all_paths(self) -> list[list[str]]:
+    def find_all_paths(
+            self,
+            max_paths: int | None = None,
+            ) -> list[list[str]]:
         """
         Enumerate every *simple* path (no zone visited twice) from the
         start hub to the end hub, in DFS order.
@@ -63,8 +66,6 @@ class DijkstraPathfinding:
             goal cannot be reached.
         """
         all_paths: list[list[str]] = []
-        max_paths = min(self.graph.drone_count, 50)
-        max_paths_count = 0
         start = self.graph.start_zone.name
         end_zone_name = self.graph.end_zone.name
         first_parents: dict[str, str | None] = {start: None}
@@ -81,8 +82,7 @@ class DijkstraPathfinding:
             # continue beyond the destination would be emitted too.
             if zone_name == end_zone_name:
                 all_paths.append(self._build_path(zone_name, parents))
-                max_paths_count += 1
-                if max_paths_count >= max_paths:
+                if max_paths is not None and len(all_paths) >= max_paths:
                     break
                 continue
 

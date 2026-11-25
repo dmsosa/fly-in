@@ -29,7 +29,7 @@ class ConnectionParser():
                 Must be 'zoneA-zoneB'"
                 )
 
-        conn_data = {
+        conn_data: dict[str, Any] = {
             "zone_a": zone_names[0],
             "zone_b": zone_names[1],
             "max_link_capacity": None,

@@ -40,7 +40,7 @@ class Menu:
                     label=item,
                     keys={
                         item[0],
-                        item[0].upper,
+                        item[0].upper(),
                         str(idx)
                     }
                 )
@@ -104,7 +104,7 @@ class FlyinMenu():
         """Start with nothing selected."""
         self.items: List[str]
         self._config_dir: Path | None = None
-        self._file_name: Path | None = None
+        self._file_name: str = ""
         self._path_to_config: Path | None = None
         self.active_menu: Menu | None
         self.printer: FlyinPrinter = printer
@@ -146,7 +146,7 @@ class FlyinMenu():
                 continue
 
             self.items.append("❌  Exit")
-            paths.append(None)
+            paths.append("")
 
             self.active_menu = Menu(
                 "Select an option:",
